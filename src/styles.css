@@ -1,5 +1,5 @@
 /* ============================================================
-   omukun Shift - Design System & Stylesheet (Editorial Workstation)
+   omukun Shift - Design System & Stylesheet (SUKETTO Workstation)
    ============================================================ */
 
 /* --- Typography: Higure Gothic --- */
@@ -45,17 +45,17 @@
 
 /* --- Design Tokens --- */
 :root {
-  --font-family-brand: 'HigureGothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Segoe UI', sans-serif;
+  --font-family-brand: 'HigureGothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
   --font-family-body: 'HigureGothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
 
   /* Monochrome Base Palette */
   --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-subtle: #f4f4f5;
-  --color-surface-hover: #ececec;
+  --color-surface-subtle: #f8f8f9;
+  --color-surface-hover: #f1f1f2;
 
   --color-text: #09090b;
-  --color-text-secondary: #52525b;
+  --color-text-secondary: #3f3f46;
   --color-text-muted: #71717a;
 
   --color-border: #e4e4e7;
@@ -78,33 +78,25 @@
 
   --color-success: #059669;
   --color-success-bg: #ecfdf5;
-  --color-success-border: #a7f3d0;
 
-  /* Spacing Scale (4px grid) */
+  /* Spacing Grid (tight, dense tool grid) */
   --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 18px;
   --space-6: 24px;
-  --space-8: 32px;
 
-  /* Radii - Tool-like, Minimal Rounding */
+  /* Sharp Tool Radii - Zero Pills */
   --radius-none: 0px;
   --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-full: 9999px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
 
-  /* Minimal Shadows */
-  --shadow-none: none;
-  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sheet: 0 -4px 20px rgba(0, 0, 0, 0.08);
-
-  /* Fast Tool Transitions */
-  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Fast Resresponsive Workstation Transitions */
+  --transition-fast: 80ms ease;
+  --transition-normal: 150ms ease;
 }
 
 /* Base Reset */
@@ -122,8 +114,9 @@ html, body {
   color: var(--color-text);
   font-family: var(--font-family-body);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.4;
   overflow-x: hidden;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -141,8 +134,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-5);
-  height: 48px;
+  padding: 0 var(--space-4);
+  height: 42px;
   background: #ffffff;
   border-bottom: 1px solid var(--color-border);
 }
@@ -154,14 +147,14 @@ html, body {
 }
 
 .brand-logo {
-  height: 20px;
+  height: 18px;
   width: auto;
 }
 
 .brand-title {
   font-family: var(--font-family-brand);
-  font-weight: 800;
-  font-size: 1.05rem;
+  font-weight: 900;
+  font-size: 0.95rem;
   letter-spacing: -0.02em;
   color: var(--color-text);
 }
@@ -179,26 +172,23 @@ html, body {
   background: #ffffff;
   border: 1px solid var(--color-border);
   padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   font-size: 0.725rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: var(--transition-fast);
 }
 
 .store-code-badge:hover {
   border-color: var(--color-border-strong);
-  color: var(--color-text);
 }
 
-/* Role Switcher Tool Buttons */
+/* Sharp Rectangular Role Switcher Toggle */
 .role-switcher {
   display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
   overflow: hidden;
-  background: var(--color-surface-subtle);
 }
 
 .role-btn {
@@ -206,10 +196,14 @@ html, body {
   background: transparent;
   color: var(--color-text-secondary);
   padding: 3px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.725rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--transition-fast);
+  border-right: 1px solid var(--color-border);
+}
+
+.role-btn:last-child {
+  border-right: none;
 }
 
 .role-btn.active {
@@ -222,61 +216,60 @@ html, body {
   color: var(--color-text-muted);
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-weight: 500;
+  gap: 4px;
+  font-weight: 600;
 }
 
 /* --- Main Workspace Layout --- */
 .main-content {
   flex: 1;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
-/* --- Editorial Metadata Header Strips --- */
+/* --- Continuous Workstation Header Strip --- */
 .workspace-header-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: #ffffff;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xs);
 }
 
 .header-strip-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
-  font-size: 0.8rem;
+  gap: var(--space-3);
+  font-size: 0.775rem;
   color: var(--color-text-secondary);
 }
 
 .header-strip-item {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .header-strip-label {
-  font-size: 0.7rem;
+  font-size: 0.675rem;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--color-text-muted);
-  letter-spacing: 0.02em;
 }
 
 .header-strip-value {
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   color: var(--color-text);
 }
 
@@ -290,48 +283,50 @@ html, body {
 
 .header-strip-divider {
   width: 1px;
-  height: 14px;
+  height: 12px;
   background: var(--color-border);
 }
 
-/* Segmented Tool Switcher */
+/* Sharp Tool Controls */
 .segmented-control {
   display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
   overflow: hidden;
+  background: #ffffff;
 }
 
 .segmented-btn {
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 4px 12px;
-  font-size: 0.775rem;
-  font-weight: 600;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: var(--transition-fast);
+  border-right: 1px solid var(--color-border);
+}
+
+.segmented-btn:last-child {
+  border-right: none;
 }
 
 .segmented-btn.active {
-  background: #ffffff;
-  color: var(--color-text);
-  font-weight: 700;
-  box-shadow: var(--shadow-subtle);
+  background: var(--color-accent-black);
+  color: #ffffff;
 }
 
-/* --- Buttons --- */
+/* Sharp Action Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: 5px 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  font-size: 0.775rem;
+  font-weight: 700;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-strong);
   cursor: pointer;
   transition: var(--transition-fast);
   user-select: none;
@@ -355,21 +350,22 @@ html, body {
 
 .btn-secondary:hover {
   background: var(--color-surface-subtle);
-  border-color: #a1a1aa;
+  border-color: var(--color-border-strong);
 }
 
 .btn-accent {
   background: var(--color-brand-orange);
   color: #ffffff;
+  border-color: var(--color-brand-orange);
 }
 
 .btn-accent:hover {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .btn-sm {
-  padding: 3px 8px;
-  font-size: 0.725rem;
+  padding: 2px 6px;
+  font-size: 0.7rem;
 }
 
 .btn-active {
@@ -378,22 +374,21 @@ html, body {
   border-color: var(--color-accent-black);
 }
 
-/* --- Calendar Table Surface --- */
+/* --- Table Grid Surface --- */
 .calendar-surface {
   display: flex;
   flex-direction: column;
   background: #ffffff;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
 }
 
 .calendar-surface-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
-  background: #ffffff;
+  background: var(--color-surface-subtle);
 }
 
 .calendar-grid-table {
@@ -404,12 +399,13 @@ html, body {
 }
 
 .calendar-weekday-cell {
-  background: var(--color-surface-subtle);
+  background: #fafafa;
   text-align: center;
-  font-size: 0.725rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   color: var(--color-text-muted);
-  padding: 6px 0;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .calendar-weekday-cell.weekend {
@@ -417,20 +413,19 @@ html, body {
 }
 
 .calendar-cell {
-  min-height: 105px;
+  min-height: 100px;
   background: #ffffff;
-  padding: 6px;
+  padding: 4px var(--space-1);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
-  transition: background var(--transition-fast);
   position: relative;
   user-select: none;
 }
 
 .calendar-cell:hover {
-  background: #fafafa;
+  background: #f8f8f9;
 }
 
 .calendar-cell.selected {
@@ -451,7 +446,7 @@ html, body {
 
 .calendar-cell-num {
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.825rem;
   color: var(--color-text);
 }
 
@@ -466,49 +461,48 @@ html, body {
   margin-left: 2px;
 }
 
-/* Staff Availability Cell Indicators (Clean typography/tag, non-bubbly) */
+/* Sharp Operational Tags (Non-bubbly) */
 .avail-tag {
-  font-size: 0.7rem;
+  font-size: 0.675rem;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
+  padding: 1px 4px;
+  border-radius: 0px;
   text-align: center;
-  letter-spacing: -0.01em;
+  border: 1px solid transparent;
 }
 
-.avail-tag-unset { background: var(--color-surface-subtle); color: var(--color-text-muted); border: 1px dashed var(--color-border); }
-.avail-tag-full { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-.avail-tag-until { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-.avail-tag-from { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
-.avail-tag-range { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-.avail-tag-unavailable { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.avail-tag-unset { background: #fafafa; color: var(--color-text-muted); border-color: var(--color-border); }
+.avail-tag-full { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.avail-tag-until { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.avail-tag-from { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+.avail-tag-range { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.avail-tag-unavailable { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 
 /* Shortage Indicators in Manager Month Cell */
 .cell-shortage-box {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 1px;
+  margin-top: 2px;
 }
 
 .shortage-slot-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.65rem;
+  font-size: 0.625rem;
   font-weight: 700;
   color: var(--color-danger-text);
   background: var(--color-danger-bg);
   border-left: 2px solid var(--color-danger);
-  padding: 1px 4px;
+  padding: 0 3px;
 }
 
 .shortage-mini-bar {
-  height: 4px;
-  background: var(--color-surface-subtle);
-  border-radius: 2px;
+  height: 3px;
+  background: var(--color-border-subtle);
   position: relative;
-  margin: 3px 0;
+  margin: 2px 0;
   overflow: hidden;
 }
 
@@ -518,13 +512,12 @@ html, body {
   background: var(--color-danger);
 }
 
-/* --- Day Mode Working Surface (SUKETTO Style Layout) --- */
+/* --- Day Timeline Table Surface --- */
 .day-workspace {
   display: flex;
   flex-direction: column;
   background: #ffffff;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
 }
 
 .day-workspace-toolbar {
@@ -532,26 +525,26 @@ html, body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
-  background: #ffffff;
+  background: var(--color-surface-subtle);
 }
 
-/* Staffing Coverage Strip Row */
+/* Coverage Strip Row */
 .coverage-strip {
   display: flex;
-  height: 28px;
+  height: 24px;
   align-items: center;
-  background: var(--color-surface-subtle);
+  background: #fafafa;
   border-bottom: 1px solid var(--color-border);
-  font-size: 0.7rem;
+  font-size: 0.675rem;
 }
 
 .coverage-label {
-  width: 140px;
+  width: 130px;
   flex-shrink: 0;
-  padding-left: var(--space-3);
-  font-weight: 700;
+  padding-left: var(--space-2);
+  font-weight: 800;
   color: var(--color-text-muted);
   border-right: 1px solid var(--color-border);
 }
@@ -564,19 +557,18 @@ html, body {
 
 .coverage-cell {
   flex: 1;
-  min-width: 48px;
+  min-width: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.725rem;
+  font-weight: 800;
+  font-size: 0.675rem;
   border-right: 1px solid var(--color-border-subtle);
 }
 
 .coverage-cell.shortage {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
-  font-weight: 800;
 }
 
 /* Main Timeline Grid Surface */
@@ -585,25 +577,25 @@ html, body {
 }
 
 .timeline-grid-table {
-  min-width: 860px;
+  min-width: 840px;
   display: flex;
   flex-direction: column;
 }
 
 .timeline-header-row {
   display: flex;
-  height: 26px;
+  height: 24px;
   align-items: center;
   border-bottom: 1px solid var(--color-border);
-  background: #fafafa;
+  background: var(--color-surface-subtle);
 }
 
 .timeline-corner-cell {
-  width: 140px;
+  width: 130px;
   flex-shrink: 0;
-  padding-left: var(--space-3);
-  font-size: 0.7rem;
-  font-weight: 700;
+  padding-left: var(--space-2);
+  font-size: 0.675rem;
+  font-weight: 800;
   color: var(--color-text-muted);
   border-right: 1px solid var(--color-border);
 }
@@ -616,11 +608,11 @@ html, body {
 
 .timeline-hour-head {
   flex: 1;
-  min-width: 48px;
-  font-size: 0.7rem;
+  min-width: 44px;
+  font-size: 0.675rem;
   font-weight: 700;
   color: var(--color-text-muted);
-  padding-left: 4px;
+  padding-left: 3px;
   border-right: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
@@ -629,20 +621,20 @@ html, body {
 /* Staff Rows */
 .timeline-staff-row {
   display: flex;
-  height: 48px;
+  height: 42px;
   border-bottom: 1px solid var(--color-border-subtle);
   position: relative;
 }
 
 .timeline-staff-cell {
-  width: 140px;
+  width: 130px;
   flex-shrink: 0;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-2);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.775rem;
   border-right: 1px solid var(--color-border);
   background: #ffffff;
   position: sticky;
@@ -651,15 +643,15 @@ html, body {
 }
 
 .timeline-staff-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .timeline-staff-hours {
-  font-size: 0.675rem;
-  font-weight: 500;
+  font-size: 0.65rem;
+  font-weight: 600;
   color: var(--color-text-muted);
   margin-left: auto;
 }
@@ -674,7 +666,6 @@ html, body {
   cursor: crosshair;
 }
 
-/* Background hour vertical grid lines */
 .timeline-grid-lines {
   position: absolute;
   inset: 0;
@@ -687,12 +678,11 @@ html, body {
   border-right: 1px solid #f4f4f5;
 }
 
-/* Availability and Shift Blocks */
+/* Shift and Availability Blocks */
 .avail-block-layer {
   position: absolute;
-  height: 72%;
-  top: 14%;
-  border-radius: var(--radius-xs);
+  height: 70%;
+  top: 15%;
   opacity: 0.25;
   pointer-events: none;
   border: 1px dashed currentColor;
@@ -702,27 +692,23 @@ html, body {
   position: absolute;
   height: 80%;
   top: 10%;
-  border-radius: var(--radius-sm);
+  border-radius: 0px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  padding: 0 6px;
+  font-size: 0.675rem;
+  font-weight: 800;
   color: #ffffff;
   cursor: pointer;
   user-select: none;
-  border: 1px solid rgba(0,0,0,0.2);
+  border: 1px solid rgba(0,0,0,0.3);
   transition: filter var(--transition-fast);
   z-index: 5;
 }
 
-.shift-block-layer:hover {
-  filter: brightness(1.08);
-}
-
 .shift-resize-handle {
-  width: 6px;
+  width: 5px;
   height: 100%;
   position: absolute;
   top: 0;
@@ -738,70 +724,37 @@ html, body {
   height: 100%;
   background: repeating-linear-gradient(
     45deg,
-    rgba(0,0,0,0.15),
-    rgba(0,0,0,0.15) 3px,
-    rgba(0,0,0,0.3) 3px,
-    rgba(0,0,0,0.3) 6px
+    rgba(0,0,0,0.2),
+    rgba(0,0,0,0.2) 3px,
+    rgba(0,0,0,0.35) 3px,
+    rgba(0,0,0,0.35) 6px
   );
-  border-radius: 1px;
 }
 
-/* --- Context Inspector Side Panel / Bottom Sheet --- */
-.inspector-layout {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: var(--space-4);
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .inspector-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.context-inspector-panel {
+/* --- Context Inspector Table --- */
+.settings-group {
   background: #ffffff;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
-.inspector-title {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--space-2);
+.settings-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.inspector-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
   font-size: 0.8rem;
 }
 
-.inspector-row-label {
-  color: var(--color-text-secondary);
-}
-
-.inspector-row-value {
-  font-weight: 700;
-  color: var(--color-text);
+.settings-row:last-child {
+  border-bottom: none;
 }
 
 /* --- Bottom Sheet Dialogs --- */
 .bottom-sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -818,16 +771,13 @@ html, body {
 
 .bottom-sheet {
   width: 100%;
-  max-width: 540px;
+  max-width: 500px;
   background: #ffffff;
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  border-bottom: none;
-  padding: var(--space-5);
+  border-top: 2px solid var(--color-accent-black);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   max-height: 85vh;
   overflow-y: auto;
   transform: translateY(100%);
@@ -839,115 +789,109 @@ html, body {
 }
 
 .sheet-handle {
-  width: 32px;
+  width: 28px;
   height: 3px;
   background: #e4e4e7;
-  border-radius: var(--radius-full);
   align-self: center;
 }
 
 /* --- Toast Overlay --- */
 .toast-container {
   position: fixed;
-  bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   pointer-events: none;
 }
 
 .toast {
   background: var(--color-accent-black);
   color: #ffffff;
-  padding: 6px var(--space-4);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  animation: toastIn 150ms ease;
+  padding: 5px var(--space-3);
+  border-radius: var(--radius-xs);
+  font-size: 0.775rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  animation: toastIn 100ms ease;
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translate(-50%, 8px); }
+  from { opacity: 0; transform: translate(-50%, 6px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* Radio Select Option Rows for Day Availability Input */
+/* Radio Option Select Table for Staff Day Input */
 .radio-select-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  border: 1px solid var(--color-border);
 }
 
 .radio-select-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px var(--space-3);
+  padding: 6px var(--space-3);
   background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
-  transition: var(--transition-fast);
   user-select: none;
 }
 
+.radio-select-row:last-child {
+  border-bottom: none;
+}
+
 .radio-select-row:hover {
-  border-color: #a1a1aa;
+  background: var(--color-surface-subtle);
 }
 
 .radio-select-row.selected {
-  border-color: var(--color-accent-black);
-  background: var(--color-surface-subtle);
+  background: var(--color-accent-black);
+  color: #ffffff;
   font-weight: 700;
 }
 
+.radio-select-row.selected .radio-indicator {
+  border-color: #ffffff;
+  background: #ffffff;
+}
+
 .radio-indicator {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.radio-select-row.selected .radio-indicator::after {
-  content: '';
-  width: 8px;
-  height: 8px;
-  background: var(--color-accent-black);
-  border-radius: 50%;
-}
-
-/* Multi-date Toolbar */
+/* Multi-date Bar */
 .multiselect-bar {
   position: sticky;
-  bottom: var(--space-4);
+  bottom: var(--space-3);
   z-index: 30;
   background: var(--color-accent-black);
   color: #ffffff;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  border: 1px solid var(--color-border-strong);
 }
 
 /* Form Controls */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 3px;
 }
 
 .form-label {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.725rem;
+  font-weight: 800;
   color: var(--color-text-secondary);
 }
 
@@ -955,58 +899,36 @@ html, body {
   background: #ffffff;
   border: 1px solid var(--color-border);
   color: var(--color-text);
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: 0.825rem;
   outline: none;
-  transition: border-color var(--transition-fast);
 }
 
 .form-input:focus, .form-select:focus {
   border-color: var(--color-accent-black);
 }
 
-/* Grouped Settings Table Rows */
-.settings-group {
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.settings-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-size: 0.825rem;
-}
-
-.settings-row:last-child {
-  border-bottom: none;
-}
-
-/* Responsive Queries */
+/* Mobile Responsive Adjustments */
 @media (max-width: 640px) {
   .app-header {
     padding: 0 var(--space-3);
   }
 
   .main-content {
-    padding: var(--space-3);
+    padding: var(--space-2);
   }
 
   .calendar-cell {
-    min-height: 75px;
-    padding: 3px;
+    min-height: 70px;
+    padding: 2px;
   }
 
   .cell-shortage-box {
-    display: none; /* Mobile switches to iPhone date list view */
+    display: none;
   }
 
   .workspace-header-strip {
-    padding: var(--space-3);
+    padding: var(--space-2);
   }
 }
