@@ -37,11 +37,11 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
 
     return `
       <div class="staff-select-item ${!isAvailable ? 'disabled' : ''} ${isSelected ? 'selected' : ''}" data-staff-id="${m.id}" data-available="${isAvailable}">
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:10px;">
           <span class="staff-dot" style="background:${m.color};"></span>
           <div>
-            <div style="font-weight:700;">${m.name}</div>
-            <div style="font-size:0.75rem; color:var(--color-text-muted);">${m.role === 'admin' ? '管理者' : 'スタッフ'}</div>
+            <div style="font-weight:700; font-size:0.875rem;">${m.name}</div>
+            <div style="font-size:0.725rem; color:var(--color-text-muted);">${m.role === 'admin' ? '管理者' : 'スタッフ'}</div>
           </div>
         </div>
         <span class="calendar-day-status ${badgeClass}">${availLabel}</span>
@@ -50,26 +50,28 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
   }).join('');
 
   const contentHTML = `
-    <form id="create-shift-form" class="form-group">
-      <div style="font-size:0.85rem; color:var(--color-text-secondary); margin-bottom:8px;">対象日: <strong>${date}</strong></div>
+    <form id="create-shift-form" class="form-group" style="gap:var(--space-4);">
+      <div style="font-size:0.85rem; color:var(--color-text-secondary); background:var(--color-surface-subtle); padding:var(--space-2) var(--space-3); border-radius:var(--radius-sm);">
+        対象日: <strong style="color:var(--color-text);">${date}</strong>
+      </div>
 
       <div class="form-group">
-        <label class="form-label">スタッフ選択 (希望シフト表示)</label>
-        <div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; padding-right:4px;">
+        <label class="form-label">配置スタッフ選択（希望シフト一覧）</label>
+        <div style="display:flex; flex-direction:column; gap:var(--space-2); max-height:220px; overflow-y:auto; padding-right:4px;">
           ${staffListHTML}
         </div>
         <input type="hidden" id="selected-staff-id" value="${defaultMemberId || (state.members[0] ? state.members[0].id : '')}" />
       </div>
 
       <div class="form-group">
-        <label class="form-label">シフトプリセットから選択 (任意)</label>
+        <label class="form-label">シフトプリセットから自動入力 (任意)</label>
         <select id="preset-selector" class="form-select">
           <option value="">カスタム時間指定</option>
           ${state.presets.map(p => `<option value="${p.id}">${p.name} (${p.start_time}-${p.end_time})</option>`).join('')}
         </select>
       </div>
 
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:var(--space-3);">
         <div class="form-group" style="flex:1;">
           <label class="form-label">開始時間</label>
           <input type="time" id="shift-start-time" class="form-input" value="09:30" step="900" required />
@@ -85,9 +87,9 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
         <input type="number" id="shift-break-min" class="form-input" value="60" step="15" min="0" />
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">シフト作成</button>
+        <button type="submit" class="btn btn-primary">シフトを配置</button>
       </div>
     </form>
   `;
@@ -105,8 +107,8 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
           if (!isAvail) {
             showToast('⚠️ 該当スタッフは出勤不可希望を提出しています');
           }
-          staffItems.forEach(i => i.style.borderColor = 'var(--color-border-subtle)');
-          item.style.borderColor = 'var(--color-text)';
+          staffItems.forEach(i => i.style.borderColor = 'var(--color-border)');
+          item.style.borderColor = 'var(--color-accent-black)';
           hiddenStaffInput.value = item.getAttribute('data-staff-id');
         });
       });
@@ -164,24 +166,21 @@ export function runAutoScheduler(stateManager) {
   if (!period) return;
 
   const contentHTML = `
-    <div class="form-group">
-      <p style="font-size:0.85rem; color:var(--color-text-secondary);">
-        提出された希望シフト・必要人員体制・労働時間上限・プリセットを考慮し、最適な仮シフト案を自動生成します。
+    <div class="form-group" style="gap:var(--space-4);">
+      <p style="font-size:0.875rem; color:var(--color-text-secondary); line-height:1.6;">
+        提出された希望シフト・必要人員体制（時間帯別不足）・労働時間上限・プリセットを考慮し、最適な仮シフト案を自動計算して作成します。
       </p>
 
-      <div class="form-group" style="margin-top:12px;">
-        <label class="form-label">
+      <div style="background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-md); display:flex; flex-direction:column; gap:var(--space-2);">
+        <label style="font-size:0.85rem; font-weight:700; color:var(--color-text); cursor:pointer;">
           <input type="checkbox" id="opt-ignore-unset" checked /> 未入力スタッフを自動生成から除外する
         </label>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">
+        <label style="font-size:0.85rem; font-weight:700; color:var(--color-text); cursor:pointer;">
           <input type="checkbox" id="opt-keep-existing" checked /> 既存の作成済みシフトを保持する
         </label>
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
         <button type="button" id="start-auto-schedule-btn" class="btn btn-accent">仮案を自動生成</button>
       </div>
@@ -201,7 +200,6 @@ export function runAutoScheduler(stateManager) {
 
         const newAssignments = keepExisting ? [...state.assignments] : [];
 
-        // Track member scheduled hours
         const memberHoursMap = new Map();
         state.members.forEach(m => {
           let hrs = 0;
@@ -224,9 +222,8 @@ export function runAutoScheduler(stateManager) {
 
         for (const dateKey of datesInMonth) {
           const existingOnDate = newAssignments.filter(a => a.date === dateKey);
-          if (existingOnDate.length >= 2) continue; // Already met minimal staffing
+          if (existingOnDate.length >= 2) continue;
 
-          // Sort staff by total scheduled hours ascending to ensure fair distribution
           const sortedMembers = [...state.members].sort((a, b) => {
             return (memberHoursMap.get(a.id) || 0) - (memberHoursMap.get(b.id) || 0);
           });
@@ -234,19 +231,16 @@ export function runAutoScheduler(stateManager) {
           for (const member of sortedMembers) {
             const avail = state.availability.find(a => a.member_id === member.id && a.date === dateKey);
 
-            // Hard Constraints
             if (!avail && ignoreUnset) continue;
             if (avail && avail.state === 'unavailable') continue;
             if (newAssignments.some(a => a.member_id === member.id && a.date === dateKey)) continue;
 
-            // Hour limit constraint check
             const currentHours = memberHoursMap.get(member.id) || 0;
-            const shiftHours = 8; // approx shift length
+            const shiftHours = 8;
             if (member.max_monthly_hours && (currentHours + shiftHours) > member.max_monthly_hours) {
               continue;
             }
 
-            // Pick appropriate preset
             const chosenPreset = presets[addedCount % presets.length];
 
             newAssignments.push({
