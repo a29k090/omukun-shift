@@ -100,6 +100,12 @@ function renderManagerMonthView(state) {
 
   const activeStaffMembers = (state.members || []).filter(m => m.role === 'staff' && m.status === 'active');
 
+  // Insert empty offset cells so Day 1 aligns with its correct day-of-week column
+  const firstDayOfWeekIndex = new Date(year, monthIndex, 1).getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  for (let offset = 0; offset < firstDayOfWeekIndex; offset++) {
+    monthGridHTML += `<div class="calendar-cell calendar-cell-empty" style="background:#fafafa; cursor:default;"></div>`;
+  }
+
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);
