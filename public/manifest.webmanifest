@@ -1,0 +1,16 @@
+{
+  "short_name": "omukun Shift",
+  "name": "omukun Shift - シフト管理",
+  "icons": [
+    {
+      "src": "/src/assets/brand/omukun-logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "display": "standalone",
+  "orientation": "any"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "omukun-shift",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vite": "^5.4.2",
+    "vitest": "^2.0.5"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1"
+  }
+}
