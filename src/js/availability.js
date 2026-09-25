@@ -1,4 +1,4 @@
-// Staff Availability Calendar Component and Interactions
+// Staff Availability Calendar Component and Refactored Interactions
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 
@@ -9,7 +9,7 @@ export function renderStaffAvailabilityView(state) {
   const monthIndex = parseInt(monthStr, 10) - 1;
   const daysInMonth = getDaysInMonth(year, monthIndex);
 
-  // Calculate statistics
+  // Calculate statistics for current member
   const memberAvailMap = new Map();
   state.availability
     .filter(a => a.member_id === currentMember.id)
@@ -39,9 +39,9 @@ export function renderStaffAvailabilityView(state) {
 
     calendarDaysHTML += `
       <div class="calendar-day ${state.selectedDate === dateKey ? 'selected' : ''}" data-date="${dateKey}">
-        <div style="display:flex; justify-between; align-items:center;">
-          <span class="calendar-day-num ${isWeekend ? 'weekend' : ''}">${day} <small style="font-size:0.65rem; color:var(--color-text-muted)">(${dayOfWeek})</small></span>
-          ${entry.notes ? '<span title="備考あり" style="font-size:0.65rem;">💬</span>' : ''}
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="calendar-day-num ${isWeekend ? 'weekend' : ''}">${day} <small style="font-size:0.7rem; font-weight:500; color:var(--color-text-muted)">(${dayOfWeek})</small></span>
+          ${entry.notes ? '<span title="備考あり" style="font-size:0.75rem;">💬</span>' : ''}
         </div>
         <div class="calendar-day-status ${stateBadge.class}">
           ${stateBadge.label}
@@ -50,46 +50,43 @@ export function renderStaffAvailabilityView(state) {
     `;
   }
 
-  // Preset reference list
-  const presetListHTML = state.presets.map(p => `
-    <div style="background:var(--color-surface-elevated); padding:8px 12px; border-radius:var(--radius-md); font-size:0.8rem; border:1px solid var(--color-border-subtle);">
-      <strong>${p.name}</strong>: ${p.start_time} - ${p.end_time} (休憩 ${p.break_minutes}分)
-    </div>
-  `).join('');
+  const deadlineFormatted = state.period
+    ? state.period.deadline.replace('T', ' ').substring(0, 16)
+    : '2026/09/25 23:59';
 
   return `
-    <div style="display:flex; flex-direction:column; gap:var(--space-4);">
-      <!-- Staff Profile & Summary Banner -->
-      <div class="glass-panel" style="padding:var(--space-4); border-radius:var(--radius-lg); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-3);">
-        <div>
-          <div style="display:flex; align-items:center; gap:var(--space-2);">
-            <select id="staff-select-dropdown" class="form-select" style="font-weight:700;">
-              ${state.members.map(m => `<option value="${m.id}" ${m.id === currentMember.id ? 'selected' : ''}>${m.name} (${m.role === 'admin' ? '管理者' : 'スタッフ'})</option>`).join('')}
-            </select>
-            <span style="font-size:0.85rem; color:var(--color-text-secondary);">の希望シフト</span>
-          </div>
-          <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:4px;">
-            提出期限: ${state.period ? state.period.deadline.replace('T', ' ') : '2026/09/25 23:59'}
-          </div>
+    <div style="display:flex; flex-direction:column; gap:var(--space-5);">
+      <!-- Staff Status Summary Banner (Simplified & Focused) -->
+      <div class="summary-bar">
+        <div class="summary-card">
+          <span class="summary-card-label">対象月</span>
+          <span class="summary-card-value">${year}年${monthIndex + 1}月</span>
+          <span class="summary-card-sub">${currentMember.name} さんの希望シフト</span>
         </div>
 
-        <div style="display:flex; gap:var(--space-4); text-align:center;">
-          <div>
-            <div style="font-size:1.2rem; font-weight:800; color:var(--color-success);">${enteredDays}日</div>
-            <div style="font-size:0.7rem; color:var(--color-text-muted);">入力済み</div>
-          </div>
-          <div>
-            <div style="font-size:1.2rem; font-weight:800; color:${unsetDays > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)'};">${unsetDays}日</div>
-            <div style="font-size:0.7rem; color:var(--color-text-muted);">未入力 / 未定</div>
-          </div>
+        <div class="summary-card ${unsetDays > 0 ? 'alert' : 'success'}">
+          <span class="summary-card-label">提出状況</span>
+          <span class="summary-card-value" style="color: ${unsetDays > 0 ? 'var(--color-danger)' : 'var(--color-success)'}">
+            ${enteredDays} <small style="font-size:0.8rem; font-weight:600;">/ ${daysInMonth}日 入力済</small>
+          </span>
+          <span class="summary-card-sub">${unsetDays > 0 ? `残り ${unsetDays}日 未入力` : '全日入力完了'}</span>
+        </div>
+
+        <div class="summary-card">
+          <span class="summary-card-label">提出期限</span>
+          <span class="summary-card-value" style="font-size:1.15rem;">${deadlineFormatted}</span>
+          <span class="summary-card-sub">期限内の変更・再提出が可能です</span>
         </div>
       </div>
 
       <!-- Calendar Container -->
       <div class="calendar-container">
         <div class="calendar-header">
-          <h2 style="font-size:1.1rem; font-weight:700;">${year}年${monthIndex + 1}月 シフトカレンダー</h2>
-          <button id="bulk-edit-btn" class="btn btn-secondary btn-sm">一括入力</button>
+          <div>
+            <h2 style="font-size:1.2rem; font-weight:800; letter-spacing:-0.02em;">${year}年${monthIndex + 1}月 シフト希望入力</h2>
+            <p style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:2px;">日付をタップしてご自身の勤務希望（時間・可否）を設定してください</p>
+          </div>
+          <button id="bulk-edit-btn" class="btn btn-secondary btn-sm">⚡️ 一括入力</button>
         </div>
 
         <div class="calendar-grid">
@@ -101,14 +98,6 @@ export function renderStaffAvailabilityView(state) {
           <div class="calendar-weekday">金</div>
           <div class="calendar-weekday weekend">土</div>
           ${calendarDaysHTML}
-        </div>
-      </div>
-
-      <!-- Shift Presets Reference -->
-      <div class="glass-panel" style="padding:var(--space-4); border-radius:var(--radius-lg);">
-        <h3 style="font-size:0.9rem; font-weight:700; margin-bottom:var(--space-2); color:var(--color-text-secondary);">シフトプリセット参照</h3>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:var(--space-2);">
-          ${presetListHTML}
         </div>
       </div>
     </div>
@@ -134,13 +123,6 @@ function getStateBadge(entry) {
 }
 
 export function setupAvailabilityEvents(stateManager) {
-  const staffDropdown = document.getElementById('staff-select-dropdown');
-  if (staffDropdown) {
-    staffDropdown.addEventListener('change', (e) => {
-      stateManager.setCurrentMember(e.target.value);
-    });
-  }
-
   // Tapping a calendar day opens Day Availability Editor sheet
   const dayCells = document.querySelectorAll('.calendar-day');
   dayCells.forEach(cell => {
@@ -159,7 +141,7 @@ export function setupAvailabilityEvents(stateManager) {
 
 function openDayAvailabilityEditor(stateManager, date) {
   const state = stateManager.state;
-  const currentMember = state.members.find(m => m.id === state.currentMemberId);
+  const currentMember = state.members.find(m => m.id === state.currentMemberId) || state.members[0];
   const existing = state.availability.find(a => a.member_id === currentMember.id && a.date === date) || {
     state: 'unset',
     start_time: '09:30',
@@ -167,21 +149,36 @@ function openDayAvailabilityEditor(stateManager, date) {
     notes: ''
   };
 
+  const stateOptions = [
+    { value: 'full', icon: '🟢', title: '終日OK', desc: '開所時間から閉所時間までいつでも可' },
+    { value: 'until', icon: '⏰', title: '○時まで', desc: '指定した時間まで勤務可能' },
+    { value: 'from', icon: '⏳', title: '○時から', desc: '指定した時間から勤務可能' },
+    { value: 'range', icon: '🎯', title: '時間指定', desc: '開始と終了の時間を指定' },
+    { value: 'unavailable', icon: '❌', title: '出勤不可', desc: 'この日はシフトに入れません' },
+    { value: 'unset', icon: '⚪️', title: '未設定に戻す', desc: '入力内容をリセット' }
+  ];
+
+  const stateCardsHTML = stateOptions.map(opt => `
+    <div class="state-option-card ${existing.state === opt.value ? 'selected' : ''}" data-value="${opt.value}">
+      <span class="state-option-icon">${opt.icon}</span>
+      <div>
+        <div class="state-option-title">${opt.title}</div>
+        <div class="state-option-desc">${opt.desc}</div>
+      </div>
+    </div>
+  `).join('');
+
   const contentHTML = `
-    <form id="day-avail-form" class="form-group">
+    <form id="day-avail-form" class="form-group" style="gap:var(--space-4);">
       <div class="form-group">
-        <label class="form-label">希望状況</label>
-        <select id="avail-state-select" class="form-select">
-          <option value="unset" ${existing.state === 'unset' ? 'selected' : ''}>未入力 / 未定に戻す</option>
-          <option value="full" ${existing.state === 'full' ? 'selected' : ''}>終日OK</option>
-          <option value="until" ${existing.state === 'until' ? 'selected' : ''}>○時まで</option>
-          <option value="from" ${existing.state === 'from' ? 'selected' : ''}>○時から</option>
-          <option value="range" ${existing.state === 'range' ? 'selected' : ''}>○時〜○時 (時間指定)</option>
-          <option value="unavailable" ${existing.state === 'unavailable' ? 'selected' : ''}>出勤不可</option>
-        </select>
+        <label class="form-label">希望の働き方を選択</label>
+        <div class="state-option-grid" id="state-option-grid">
+          ${stateCardsHTML}
+        </div>
+        <input type="hidden" id="avail-state-input" value="${existing.state}" />
       </div>
 
-      <div id="time-range-fields" style="display:${['until', 'from', 'range'].includes(existing.state) ? 'flex' : 'none'}; gap:var(--space-2);">
+      <div id="time-range-fields" style="display:${['until', 'from', 'range'].includes(existing.state) ? 'flex' : 'none'}; gap:var(--space-3); background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-md);">
         <div class="form-group" style="flex:1;">
           <label class="form-label">開始時間</label>
           <input type="time" id="avail-start-time" class="form-input" value="${existing.start_time || '09:30'}" step="900" />
@@ -193,36 +190,44 @@ function openDayAvailabilityEditor(stateManager, date) {
       </div>
 
       <div class="form-group">
-        <label class="form-label">備考・希望コメント</label>
+        <label class="form-label">備考・特記事項（任意）</label>
         <input type="text" id="avail-notes" class="form-input" placeholder="例: 18時以降のみ可能、講義のため遅れます" value="${existing.notes || ''}" />
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-3);">
+      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">保存</button>
+        <button type="submit" class="btn btn-primary">保存する</button>
       </div>
     </form>
   `;
 
   createBottomSheet({
-    title: `${date} 希望シフト編集`,
+    title: `${date} のシフト希望入力`,
     contentHTML,
     onOpen: (body) => {
-      const stateSelect = body.querySelector('#avail-state-select');
+      const stateCards = body.querySelectorAll('.state-option-card');
+      const stateInput = body.querySelector('#avail-state-input');
       const timeFields = body.querySelector('#time-range-fields');
 
-      stateSelect.addEventListener('change', () => {
-        if (['until', 'from', 'range'].includes(stateSelect.value)) {
-          timeFields.style.display = 'flex';
-        } else {
-          timeFields.style.display = 'none';
-        }
+      stateCards.forEach(card => {
+        card.addEventListener('click', () => {
+          const val = card.getAttribute('data-value');
+          stateCards.forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          stateInput.value = val;
+
+          if (['until', 'from', 'range'].includes(val)) {
+            timeFields.style.display = 'flex';
+          } else {
+            timeFields.style.display = 'none';
+          }
+        });
       });
 
       const form = body.querySelector('#day-avail-form');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const selectedState = stateSelect.value;
+        const selectedState = stateInput.value;
         const startTime = body.querySelector('#avail-start-time').value;
         const endTime = body.querySelector('#avail-end-time').value;
         const notes = body.querySelector('#avail-notes').value;
@@ -245,14 +250,14 @@ function openDayAvailabilityEditor(stateManager, date) {
 
 function openBulkAvailabilityEditor(stateManager) {
   const state = stateManager.state;
-  const currentMember = state.members.find(m => m.id === state.currentMemberId);
+  const currentMember = state.members.find(m => m.id === state.currentMemberId) || state.members[0];
   const [yearStr, monthStr] = state.currentMonthKey.split('-');
   const daysInMonth = getDaysInMonth(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1);
 
   const contentHTML = `
-    <form id="bulk-avail-form" class="form-group">
+    <form id="bulk-avail-form" class="form-group" style="gap:var(--space-4);">
       <div class="form-group">
-        <label class="form-label">適用対象日</label>
+        <label class="form-label">適用する曜日・範囲</label>
         <select id="bulk-target-type" class="form-select">
           <option value="weekdays">平日全て (月〜金)</option>
           <option value="weekends">土日祝日全て</option>
@@ -263,21 +268,21 @@ function openBulkAvailabilityEditor(stateManager) {
       <div class="form-group">
         <label class="form-label">一括設定する希望状態</label>
         <select id="bulk-state-select" class="form-select">
-          <option value="full">終日OK</option>
-          <option value="unavailable">出勤不可</option>
-          <option value="unset">未入力にリセット</option>
+          <option value="full">🟢 終日OK</option>
+          <option value="unavailable">❌ 出勤不可</option>
+          <option value="unset">⚪️ 未入力にリセット</option>
         </select>
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-3);">
+      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">一括適用</button>
+        <button type="submit" class="btn btn-primary">一括適用する</button>
       </div>
     </form>
   `;
 
   createBottomSheet({
-    title: '希望シフト一括入力',
+    title: '希望シフト一括設定',
     contentHTML,
     onOpen: (body) => {
       const form = body.querySelector('#bulk-avail-form');
