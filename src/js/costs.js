@@ -23,43 +23,40 @@ export function renderLaborCostPanel(state) {
     // Constraint warnings
     let warningBadge = '';
     if (member.max_monthly_hours && memberHours > member.max_monthly_hours) {
-      warningBadge = `<span style="background:var(--color-danger-bg); color:var(--color-danger-text); border:1px solid var(--color-danger-border); padding:2px 6px; border-radius:4px; font-size:0.725rem; font-weight:700;">⚠️ 上限超過 (${memberHours.toFixed(1)} / ${member.max_monthly_hours}h)</span>`;
+      warningBadge = `<span style="background:var(--color-danger-bg); color:var(--color-danger-text); border:1px solid var(--color-danger-border); padding:1px 5px; border-radius:2px; font-size:0.7rem; font-weight:700;">⚠️ 上限超過 (${memberHours.toFixed(1)} / ${member.max_monthly_hours}h)</span>`;
     } else if (member.min_monthly_hours && memberHours < member.min_monthly_hours) {
-      warningBadge = `<span style="background:var(--color-warning-bg); color:var(--color-warning); border:1px solid var(--color-warning-border); padding:2px 6px; border-radius:4px; font-size:0.725rem; font-weight:700;">⚠️ 最低未達 (${memberHours.toFixed(1)} / ${member.min_monthly_hours}h)</span>`;
+      warningBadge = `<span style="background:var(--color-warning-bg); color:var(--color-warning); border:1px solid var(--color-warning-border); padding:1px 5px; border-radius:2px; font-size:0.7rem; font-weight:700;">⚠️ 最低未達 (${memberHours.toFixed(1)} / ${member.min_monthly_hours}h)</span>`;
     }
 
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--color-border-subtle); font-size:0.85rem;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span class="staff-dot" style="background:${member.color}"></span>
-          <strong style="font-weight:700;">${member.name}</strong>
-          <span style="font-size:0.725rem; color:var(--color-text-muted);">時給: ${formatCurrency(member.hourly_rate || 1100)}</span>
+      <div class="settings-row">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="timeline-staff-dot" style="background:${member.color}"></span>
+          <strong style="font-weight:700; font-size:0.825rem;">${member.name}</strong>
+          <span style="font-size:0.725rem; color:var(--color-text-muted);">時給 ${formatCurrency(member.hourly_rate || 1100)}</span>
         </div>
-        <div style="display:flex; align-items:center; gap:16px;">
+        <div style="display:flex; align-items:center; gap:12px;">
           ${warningBadge}
-          <span style="font-weight:800; font-size:0.9rem;">${memberHours.toFixed(1)}h</span>
-          <span style="color:var(--color-text-secondary); width:90px; text-align:right; font-weight:600;">${formatCurrency(memberCost)}</span>
+          <span style="font-weight:800; font-size:0.825rem;">${memberHours.toFixed(1)}h</span>
+          <span style="color:var(--color-text-secondary); width:80px; text-align:right; font-weight:600; font-size:0.825rem;">${formatCurrency(memberCost)}</span>
         </div>
       </div>
     `;
   }).join('');
 
   return `
-    <details class="inspector-panel" open>
-      <summary style="font-weight:800; cursor:pointer; font-size:0.95rem; display:flex; justify-content:space-between; align-items:center; user-select:none;">
+    <div class="settings-group">
+      <div class="settings-row" style="background:var(--color-surface-subtle); border-bottom:1px solid var(--color-border);">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span>🛠️ 労働時間・概算人件費インスペクター</span>
-          <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:600;">(管理者モード限定)</span>
+          <span style="font-weight:800; font-size:0.85rem;">労働時間・人件費インスペクター</span>
+          <span style="font-size:0.725rem; color:var(--color-text-muted); font-weight:600;">(月間合計)</span>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
-          <span style="font-size:1.1rem; font-weight:800; color:var(--color-accent-black);">${formatCurrency(totalEstimatedCost)}</span>
-          <span style="font-size:0.8rem; font-weight:700; color:var(--color-text-secondary);">(${totalMonthlyHours.toFixed(1)}時間)</span>
+          <span style="font-size:0.85rem; font-weight:800; color:var(--color-accent-black);">${formatCurrency(totalEstimatedCost)}</span>
+          <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-secondary);">(${totalMonthlyHours.toFixed(1)}時間)</span>
         </div>
-      </summary>
-
-      <div style="margin-top:var(--space-4); display:flex; flex-direction:column;">
-        ${staffSummaries}
       </div>
-    </details>
+      ${staffSummaries}
+    </div>
   `;
 }

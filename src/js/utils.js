@@ -98,6 +98,26 @@ export function calculateDayShortages(dateKey, state) {
 }
 
 /**
+ * Renders horizontal mini-timeline shortage bar representing 09:00 - 21:30.
+ */
+export function renderMiniShortageBar(shortageItems, storeOpenTime = '09:00', storeCloseTime = '21:30') {
+  if (!shortageItems || shortageItems.length === 0) return '';
+  const openM = parseTimeMinutes(storeOpenTime);
+  const closeM = parseTimeMinutes(storeCloseTime);
+  const totalM = Math.max(1, closeM - openM);
+
+  const segments = shortageItems.map(item => {
+    const startM = parseTimeMinutes(item.timeStart);
+    const endM = parseTimeMinutes(item.timeEnd);
+    const leftPct = Math.max(0, ((startM - openM) / totalM) * 100);
+    const widthPct = Math.min(100 - leftPct, ((endM - startM) / totalM) * 100);
+    return `<div class="shortage-mini-segment" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%;"></div>`;
+  }).join('');
+
+  return `<div class="shortage-mini-bar" title="不足時間帯">${segments}</div>`;
+}
+
+/**
  * Calculates monthly summary metrics for the manager workspace header.
  */
 export function calculateManagerSummary(state) {
@@ -106,7 +126,7 @@ export function calculateManagerSummary(state) {
   const availability = state.availability || [];
   const monthKey = state.currentMonthKey || '2026-10';
 
-  // 1. Submitted staff count (staff who have entered at least one availability entry)
+  // 1. Submitted staff count
   const staffMembers = members.filter(m => m.role === 'staff');
   let submittedStaffCount = 0;
 

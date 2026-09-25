@@ -2,6 +2,10 @@
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 
+// Local UI state for multi-date selection in Staff mode
+let multiSelectActive = false;
+const selectedDatesSet = new Set();
+
 export function renderStaffAvailabilityView(state) {
   const currentMember = state.members.find(m => m.id === state.currentMemberId) || state.members[0];
   const [yearStr, monthStr] = state.currentMonthKey.split('-');
@@ -9,7 +13,7 @@ export function renderStaffAvailabilityView(state) {
   const monthIndex = parseInt(monthStr, 10) - 1;
   const daysInMonth = getDaysInMonth(year, monthIndex);
 
-  // Calculate statistics for current member
+  // Map member's availability entries
   const memberAvailMap = new Map();
   state.availability
     .filter(a => a.member_id === currentMember.id)
@@ -28,115 +32,176 @@ export function renderStaffAvailabilityView(state) {
     }
   }
 
-  // Generate calendar days HTML
+  // Formatting deadline
+  const deadlineFormatted = state.period
+    ? state.period.deadline.replace('T', ' ').substring(0, 16)
+    : '2026/09/25 23:59';
+
+  // Generate calendar cells
   let calendarDaysHTML = '';
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);
     const isWeekend = dayOfWeek === '土' || dayOfWeek === '日';
     const entry = memberAvailMap.get(dateKey) || { state: 'unset' };
-    const stateBadge = getStateBadge(entry);
+    const tag = getAvailTagHTML(entry);
+    const isSelected = multiSelectActive ? selectedDatesSet.has(dateKey) : state.selectedDate === dateKey;
 
     calendarDaysHTML += `
-      <div class="calendar-day ${state.selectedDate === dateKey ? 'selected' : ''}" data-date="${dateKey}">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span class="calendar-day-num ${isWeekend ? 'weekend' : ''}">${day} <small style="font-size:0.7rem; font-weight:500; color:var(--color-text-muted)">(${dayOfWeek})</small></span>
-          ${entry.notes ? '<span title="備考あり" style="font-size:0.75rem;">💬</span>' : ''}
+      <div class="calendar-cell ${isSelected ? 'selected' : ''}" data-date="${dateKey}">
+        <div class="calendar-cell-top">
+          <span class="calendar-cell-num ${isWeekend ? 'weekend' : ''}">
+            ${day}<small class="calendar-cell-dayofweek">(${dayOfWeek})</small>
+          </span>
+          ${entry.notes ? '<span title="備考あり" style="font-size:0.65rem; color:var(--color-text-muted);">💬</span>' : ''}
         </div>
-        <div class="calendar-day-status ${stateBadge.class}">
-          ${stateBadge.label}
+        <div style="margin-top:auto; width:100%; text-align:center;">
+          ${tag}
         </div>
       </div>
     `;
   }
 
-  const deadlineFormatted = state.period
-    ? state.period.deadline.replace('T', ' ').substring(0, 16)
-    : '2026/09/25 23:59';
+  // Multi-select toolbar if active
+  const multiselectBarHTML = (multiSelectActive && selectedDatesSet.size > 0) ? `
+    <div class="multiselect-bar">
+      <span style="font-weight:700; font-size:0.8rem;">${selectedDatesSet.size}日 選択中</span>
+      <div style="display:flex; gap:var(--space-2);">
+        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="full">終日</button>
+        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="unavailable">出勤不可</button>
+        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="unset">クリア</button>
+      </div>
+    </div>
+  ` : '';
 
   return `
-    <div style="display:flex; flex-direction:column; gap:var(--space-5);">
-      <!-- Staff Status Summary Banner (Simplified & Focused) -->
-      <div class="summary-bar">
-        <div class="summary-card">
-          <span class="summary-card-label">対象月</span>
-          <span class="summary-card-value">${year}年${monthIndex + 1}月</span>
-          <span class="summary-card-sub">${currentMember.name} さんの希望シフト</span>
+    <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <!-- Compact Editorial Metadata Header Strip -->
+      <div class="workspace-header-strip">
+        <div class="header-strip-meta">
+          <div class="header-strip-item">
+            <span class="header-strip-label">対象月</span>
+            <span class="header-strip-value">${year}年${monthIndex + 1}月 希望シフト</span>
+          </div>
+          <div class="header-strip-divider"></div>
+          <div class="header-strip-item">
+            <span class="header-strip-label">提出期限</span>
+            <span class="header-strip-value">${deadlineFormatted}</span>
+          </div>
+          <div class="header-strip-divider"></div>
+          <div class="header-strip-item">
+            <span class="header-strip-label">入力状況</span>
+            <span class="header-strip-value ${unsetDays > 0 ? 'highlight-danger' : 'highlight-success'}">
+              ${enteredDays} / ${daysInMonth}日 入力済み
+            </span>
+          </div>
         </div>
 
-        <div class="summary-card ${unsetDays > 0 ? 'alert' : 'success'}">
-          <span class="summary-card-label">提出状況</span>
-          <span class="summary-card-value" style="color: ${unsetDays > 0 ? 'var(--color-danger)' : 'var(--color-success)'}">
-            ${enteredDays} <small style="font-size:0.8rem; font-weight:600;">/ ${daysInMonth}日 入力済</small>
-          </span>
-          <span class="summary-card-sub">${unsetDays > 0 ? `残り ${unsetDays}日 未入力` : '全日入力完了'}</span>
-        </div>
-
-        <div class="summary-card">
-          <span class="summary-card-label">提出期限</span>
-          <span class="summary-card-value" style="font-size:1.15rem;">${deadlineFormatted}</span>
-          <span class="summary-card-sub">期限内の変更・再提出が可能です</span>
+        <div style="display:flex; align-items:center; gap:var(--space-2);">
+          <button id="multi-select-toggle-btn" class="btn ${multiSelectActive ? 'btn-active' : 'btn-secondary'} btn-sm">
+            ${multiSelectActive ? '✕ 選択終了' : '☑ 複数選択'}
+          </button>
         </div>
       </div>
 
-      <!-- Calendar Container -->
-      <div class="calendar-container">
-        <div class="calendar-header">
-          <div>
-            <h2 style="font-size:1.2rem; font-weight:800; letter-spacing:-0.02em;">${year}年${monthIndex + 1}月 シフト希望入力</h2>
-            <p style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:2px;">日付をタップしてご自身の勤務希望（時間・可否）を設定してください</p>
-          </div>
-          <button id="bulk-edit-btn" class="btn btn-secondary btn-sm">⚡️ 一括入力</button>
+      <!-- Main Calendar Grid Table -->
+      <div class="calendar-surface">
+        <div class="calendar-surface-header">
+          <span style="font-weight:800; font-size:0.95rem;">${year}年${monthIndex + 1}月 カレンダー</span>
+          <span style="font-size:0.75rem; color:var(--color-text-muted);">
+            ${multiSelectActive ? '日付をタップして複数選択してください' : '日付をタップして勤務可能時間を設定'}
+          </span>
         </div>
 
-        <div class="calendar-grid">
-          <div class="calendar-weekday">日</div>
-          <div class="calendar-weekday">月</div>
-          <div class="calendar-weekday">火</div>
-          <div class="calendar-weekday">水</div>
-          <div class="calendar-weekday">木</div>
-          <div class="calendar-weekday">金</div>
-          <div class="calendar-weekday weekend">土</div>
+        <div class="calendar-grid-table">
+          <div class="calendar-weekday-cell weekend">日</div>
+          <div class="calendar-weekday-cell">月</div>
+          <div class="calendar-weekday-cell">火</div>
+          <div class="calendar-weekday-cell">水</div>
+          <div class="calendar-weekday-cell">木</div>
+          <div class="calendar-weekday-cell">金</div>
+          <div class="calendar-weekday-cell weekend">土</div>
           ${calendarDaysHTML}
         </div>
       </div>
+
+      ${multiselectBarHTML}
     </div>
   `;
 }
 
-function getStateBadge(entry) {
+function getAvailTagHTML(entry) {
   switch (entry.state) {
     case 'full':
-      return { label: '終日OK', class: 'state-full' };
+      return `<div class="avail-tag avail-tag-full">終日OK</div>`;
     case 'until':
-      return { label: `${entry.start_time || '○'}時まで`, class: 'state-until' };
+      return `<div class="avail-tag avail-tag-until">〜${entry.start_time || '18:00'}</div>`;
     case 'from':
-      return { label: `${entry.start_time || '○'}時から`, class: 'state-from' };
+      return `<div class="avail-tag avail-tag-from">${entry.start_time || '12:00'}〜</div>`;
     case 'range':
-      return { label: `${entry.start_time || '○'}〜${entry.end_time || '○'}`, class: 'state-range' };
+      return `<div class="avail-tag avail-tag-range">${entry.start_time || '09:30'}–${entry.end_time || '18:30'}</div>`;
     case 'unavailable':
-      return { label: '出勤不可', class: 'state-unavailable' };
+      return `<div class="avail-tag avail-tag-unavailable">× 不可</div>`;
     case 'unset':
     default:
-      return { label: '未入力', class: 'state-unset' };
+      return `<div class="avail-tag avail-tag-unset">未入力</div>`;
   }
 }
 
 export function setupAvailabilityEvents(stateManager) {
-  // Tapping a calendar day opens Day Availability Editor sheet
-  const dayCells = document.querySelectorAll('.calendar-day');
+  // Toggle multi-select mode
+  const toggleBtn = document.getElementById('multi-select-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      multiSelectActive = !multiSelectActive;
+      selectedDatesSet.clear();
+      stateManager.notify();
+    });
+  }
+
+  // Tapping calendar day cells
+  const dayCells = document.querySelectorAll('.calendar-cell');
   dayCells.forEach(cell => {
     cell.addEventListener('click', () => {
       const date = cell.getAttribute('data-date');
       stateManager.setSelectedDate(date);
-      openDayAvailabilityEditor(stateManager, date);
+
+      if (multiSelectActive) {
+        if (selectedDatesSet.has(date)) {
+          selectedDatesSet.delete(date);
+        } else {
+          selectedDatesSet.add(date);
+        }
+        stateManager.notify();
+      } else {
+        openDayAvailabilityEditor(stateManager, date);
+      }
     });
   });
 
-  const bulkEditBtn = document.getElementById('bulk-edit-btn');
-  if (bulkEditBtn) {
-    bulkEditBtn.addEventListener('click', () => openBulkAvailabilityEditor(stateManager));
-  }
+  // Bulk apply button in multi-select toolbar
+  const bulkBtns = document.querySelectorAll('.bulk-apply-btn');
+  bulkBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const targetState = btn.getAttribute('data-bulk-state');
+      const currentMember = stateManager.state.members.find(m => m.id === stateManager.state.currentMemberId) || stateManager.state.members[0];
+
+      const entries = Array.from(selectedDatesSet).map(d => ({
+        member_id: currentMember.id,
+        date: d,
+        state: targetState,
+        start_time: null,
+        end_time: null,
+        notes: ''
+      }));
+
+      await stateManager.saveBulkAvailability(entries);
+      showToast(`${entries.length}日分の希望を一括保存しました`);
+      selectedDatesSet.clear();
+      multiSelectActive = false;
+      stateManager.notify();
+    });
+  });
 }
 
 function openDayAvailabilityEditor(stateManager, date) {
@@ -149,40 +214,45 @@ function openDayAvailabilityEditor(stateManager, date) {
     notes: ''
   };
 
-  const stateOptions = [
-    { value: 'full', icon: '🟢', title: '終日OK', desc: '開所時間から閉所時間までいつでも可' },
-    { value: 'until', icon: '⏰', title: '○時まで', desc: '指定した時間まで勤務可能' },
-    { value: 'from', icon: '⏳', title: '○時から', desc: '指定した時間から勤務可能' },
-    { value: 'range', icon: '🎯', title: '時間指定', desc: '開始と終了の時間を指定' },
-    { value: 'unavailable', icon: '❌', title: '出勤不可', desc: 'この日はシフトに入れません' },
-    { value: 'unset', icon: '⚪️', title: '未設定に戻す', desc: '入力内容をリセット' }
+  const [y, m, d] = date.split('-');
+  const dayOfWeek = getJapaneseDayOfWeek(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+
+  const radioOptions = [
+    { value: 'full', label: '終日OK', desc: '開所全時間帯勤務可能' },
+    { value: 'range', label: '時間指定', desc: '勤務可能な時間帯を指定' },
+    { value: 'unavailable', label: '出勤不可', desc: 'この日はシフトに入れません' },
+    { value: 'unset', label: '未設定（リセット）', desc: '未入力状態に戻します' }
   ];
 
-  const stateCardsHTML = stateOptions.map(opt => `
-    <div class="state-option-card ${existing.state === opt.value ? 'selected' : ''}" data-value="${opt.value}">
-      <span class="state-option-icon">${opt.icon}</span>
+  const radioRowsHTML = radioOptions.map(opt => `
+    <div class="radio-select-row ${existing.state === opt.value ? 'selected' : ''}" data-val="${opt.value}">
       <div>
-        <div class="state-option-title">${opt.title}</div>
-        <div class="state-option-desc">${opt.desc}</div>
+        <div style="font-size:0.85rem; font-weight:700;">${opt.label}</div>
+        <div style="font-size:0.7rem; color:var(--color-text-muted);">${opt.desc}</div>
       </div>
+      <div class="radio-indicator"></div>
     </div>
   `).join('');
 
+  const isTimeRequired = existing.state === 'range' || existing.state === 'until' || existing.state === 'from';
+
   const contentHTML = `
-    <form id="day-avail-form" class="form-group" style="gap:var(--space-4);">
-      <div class="form-group">
-        <label class="form-label">希望の働き方を選択</label>
-        <div class="state-option-grid" id="state-option-grid">
-          ${stateCardsHTML}
-        </div>
-        <input type="hidden" id="avail-state-input" value="${existing.state}" />
+    <form id="day-avail-form" class="form-group" style="gap:var(--space-3);">
+      <div style="font-size:1rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
+        ${parseInt(m, 10)}月${parseInt(d, 10)}日 (${dayOfWeek}) の勤務希望
       </div>
 
-      <div id="time-range-fields" style="display:${['until', 'from', 'range'].includes(existing.state) ? 'flex' : 'none'}; gap:var(--space-3); background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-md);">
+      <div class="radio-select-group" id="avail-radio-group">
+        ${radioRowsHTML}
+      </div>
+      <input type="hidden" id="avail-state-input" value="${existing.state}" />
+
+      <div id="time-range-box" style="display:${isTimeRequired ? 'flex' : 'none'}; gap:var(--space-2); align-items:center; background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-sm);">
         <div class="form-group" style="flex:1;">
           <label class="form-label">開始時間</label>
           <input type="time" id="avail-start-time" class="form-input" value="${existing.start_time || '09:30'}" step="900" />
         </div>
+        <span style="font-weight:700; color:var(--color-text-muted); margin-top:16px;">→</span>
         <div class="form-group" style="flex:1;">
           <label class="form-label">終了時間</label>
           <input type="time" id="avail-end-time" class="form-input" value="${existing.end_time || '18:30'}" step="900" />
@@ -190,36 +260,36 @@ function openDayAvailabilityEditor(stateManager, date) {
       </div>
 
       <div class="form-group">
-        <label class="form-label">備考・特記事項（任意）</label>
-        <input type="text" id="avail-notes" class="form-input" placeholder="例: 18時以降のみ可能、講義のため遅れます" value="${existing.notes || ''}" />
+        <label class="form-label">備考・コメント（任意）</label>
+        <input type="text" id="avail-notes" class="form-input" placeholder="例: 18時以降のみ可能" value="${existing.notes || ''}" />
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">保存する</button>
+        <button type="submit" class="btn btn-primary">完了・保存</button>
       </div>
     </form>
   `;
 
   createBottomSheet({
-    title: `${date} のシフト希望入力`,
+    title: '',
     contentHTML,
     onOpen: (body) => {
-      const stateCards = body.querySelectorAll('.state-option-card');
-      const stateInput = body.querySelector('#avail-state-input');
-      const timeFields = body.querySelector('#time-range-fields');
+      const radioRows = body.querySelectorAll('.radio-select-row');
+      const hiddenState = body.querySelector('#avail-state-input');
+      const timeBox = body.querySelector('#time-range-box');
 
-      stateCards.forEach(card => {
-        card.addEventListener('click', () => {
-          const val = card.getAttribute('data-value');
-          stateCards.forEach(c => c.classList.remove('selected'));
-          card.classList.add('selected');
-          stateInput.value = val;
+      radioRows.forEach(row => {
+        row.addEventListener('click', () => {
+          const val = row.getAttribute('data-val');
+          radioRows.forEach(r => r.classList.remove('selected'));
+          row.classList.add('selected');
+          hiddenState.value = val;
 
-          if (['until', 'from', 'range'].includes(val)) {
-            timeFields.style.display = 'flex';
+          if (val === 'range') {
+            timeBox.style.display = 'flex';
           } else {
-            timeFields.style.display = 'none';
+            timeBox.style.display = 'none';
           }
         });
       });
@@ -227,7 +297,7 @@ function openDayAvailabilityEditor(stateManager, date) {
       const form = body.querySelector('#day-avail-form');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const selectedState = stateInput.value;
+        const selectedState = hiddenState.value;
         const startTime = body.querySelector('#avail-start-time').value;
         const endTime = body.querySelector('#avail-end-time').value;
         const notes = body.querySelector('#avail-notes').value;
@@ -236,90 +306,13 @@ function openDayAvailabilityEditor(stateManager, date) {
           member_id: currentMember.id,
           date,
           state: selectedState,
-          start_time: selectedState === 'until' ? startTime : (selectedState === 'from' || selectedState === 'range' ? startTime : null),
-          end_time: selectedState === 'until' ? startTime : (selectedState === 'range' ? endTime : null),
+          start_time: selectedState === 'range' ? startTime : null,
+          end_time: selectedState === 'range' ? endTime : null,
           notes
         });
 
         closeBottomSheet();
         showToast(`${date} の希望を保存しました`);
-      });
-    }
-  });
-}
-
-function openBulkAvailabilityEditor(stateManager) {
-  const state = stateManager.state;
-  const currentMember = state.members.find(m => m.id === state.currentMemberId) || state.members[0];
-  const [yearStr, monthStr] = state.currentMonthKey.split('-');
-  const daysInMonth = getDaysInMonth(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1);
-
-  const contentHTML = `
-    <form id="bulk-avail-form" class="form-group" style="gap:var(--space-4);">
-      <div class="form-group">
-        <label class="form-label">適用する曜日・範囲</label>
-        <select id="bulk-target-type" class="form-select">
-          <option value="weekdays">平日全て (月〜金)</option>
-          <option value="weekends">土日祝日全て</option>
-          <option value="all">今月全日 (1日〜${daysInMonth}日)</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">一括設定する希望状態</label>
-        <select id="bulk-state-select" class="form-select">
-          <option value="full">🟢 終日OK</option>
-          <option value="unavailable">❌ 出勤不可</option>
-          <option value="unset">⚪️ 未入力にリセット</option>
-        </select>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
-        <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">一括適用する</button>
-      </div>
-    </form>
-  `;
-
-  createBottomSheet({
-    title: '希望シフト一括設定',
-    contentHTML,
-    onOpen: (body) => {
-      const form = body.querySelector('#bulk-avail-form');
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const targetType = body.querySelector('#bulk-target-type').value;
-        const bulkState = body.querySelector('#bulk-state-select').value;
-
-        const entries = [];
-        const year = parseInt(yearStr, 10);
-        const monthIndex = parseInt(monthStr, 10) - 1;
-
-        for (let day = 1; day <= daysInMonth; day++) {
-          const dateKey = formatDateKey(year, monthIndex, day);
-          const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);
-          const isWeekend = dayOfWeek === '土' || dayOfWeek === '日';
-
-          let apply = false;
-          if (targetType === 'all') apply = true;
-          else if (targetType === 'weekdays' && !isWeekend) apply = true;
-          else if (targetType === 'weekends' && isWeekend) apply = true;
-
-          if (apply) {
-            entries.push({
-              member_id: currentMember.id,
-              date: dateKey,
-              state: bulkState,
-              start_time: null,
-              end_time: null,
-              notes: ''
-            });
-          }
-        }
-
-        await stateManager.saveBulkAvailability(entries);
-        closeBottomSheet();
-        showToast(`${entries.length}日分の希望を一括保存しました`);
       });
     }
   });
