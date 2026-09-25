@@ -27,17 +27,56 @@ export function formatCurrency(amount) {
 }
 
 /**
+ * Merges adjacent shortage intervals with identical deficit counts into continuous readable ranges.
+ */
+function mergeShortageItems(rawItems) {
+  if (!rawItems || rawItems.length === 0) return [];
+
+  const sorted = [...rawItems].sort((a, b) => parseTimeMinutes(a.timeStart) - parseTimeMinutes(b.timeStart));
+  const merged = [];
+
+  let current = null;
+
+  for (const item of sorted) {
+    if (!current) {
+      current = { ...item };
+      continue;
+    }
+
+    const curEndM = parseTimeMinutes(current.timeEnd);
+    const itemStartM = parseTimeMinutes(item.timeStart);
+
+    // Merge if adjacent/continuous and same deficit count
+    if (curEndM >= itemStartM && current.deficit === item.deficit) {
+      current.timeEnd = item.timeEnd;
+      current.required = Math.max(current.required, item.required);
+      current.available = Math.min(current.available, item.available);
+      current.noAvailableStaff = current.noAvailableStaff || item.noAvailableStaff;
+      current.isCritical = current.isCritical || item.isCritical;
+    } else {
+      merged.push(current);
+      current = { ...item };
+    }
+  }
+
+  if (current) {
+    merged.push(current);
+  }
+
+  return merged;
+}
+
+/**
  * Calculates staffing shortage for a date based on Rule Priority:
- * Specific Date Override > Weekday Override > Time Range Overrides / Store Default / Rule List.
- * Unentered staff are NEVER treated as unavailable.
+ * Specific Date Override > Weekday Override > Time Range Overrides / Store Default.
+ * Merges adjacent intervals into continuous human-readable ranges.
  */
 export function calculateDayShortages(dateKey, state) {
   const [y, m, d] = dateKey.split('-').map(Number);
   const dateObj = new Date(y, m - 1, d);
-  const dayOfWeek = dateObj.getDay(); // 0=Sun, 1=Mon...6=Sat
+  const dayOfWeek = dateObj.getDay();
 
   const rawRules = state && state.staffingRules ? state.staffingRules : [];
-
   let activeRules = [];
 
   if (Array.isArray(rawRules) && rawRules.length > 0) {
@@ -74,21 +113,18 @@ export function calculateDayShortages(dateKey, state) {
     }];
   }
 
-  // Active staff members expected
   const activeMembers = (state && state.members ? state.members : []).filter(m => (m.role === 'staff' || !m.role) && m.status !== 'inactive');
   const totalExpectedCount = activeMembers.length;
 
-  // Track availability inputs entered for this date
   const dateAvails = (state && state.availability ? state.availability : []).filter(a => a.date === dateKey);
   const enteredMemberIds = new Set(dateAvails.filter(a => a.state && a.state !== 'unset').map(a => a.member_id));
   const enteredCount = enteredMemberIds.size;
   const unenteredCount = Math.max(0, totalExpectedCount - enteredCount);
   const isProvisional = unenteredCount > 0;
 
-  // Current shift assignments for this date
   const assignments = (state && state.assignments ? state.assignments : []).filter(a => a.date === dateKey);
 
-  const shortageItems = [];
+  const rawShortageItems = [];
   let totalDeficit = 0;
 
   for (const rule of activeRules) {
@@ -112,9 +148,8 @@ export function calculateDayShortages(dateKey, state) {
       let availableCount = 0;
       for (const m of activeMembers) {
         const av = dateAvails.find(a => a.member_id === m.id);
-        if (!av || av.state === 'unset') {
-          continue;
-        }
+        if (!av || av.state === 'unset') continue;
+
         if (av.state === 'full') availableCount++;
         else if (av.state === 'range' && av.start_time && av.end_time) {
           const avStart = parseTimeMinutes(av.start_time);
@@ -127,7 +162,7 @@ export function calculateDayShortages(dateKey, state) {
         }
       }
 
-      shortageItems.push({
+      rawShortageItems.push({
         ruleId: rule.id,
         timeStart: rule.time_start || '09:00',
         timeEnd: rule.time_end || '21:30',
@@ -141,13 +176,16 @@ export function calculateDayShortages(dateKey, state) {
     }
   }
 
+  // Merge adjacent shortage ranges with identical deficits
+  const shortageItems = mergeShortageItems(rawShortageItems);
+
   const isCritical = shortageItems.some(item => item.isCritical) || totalDeficit >= 3;
 
   let summaryText = '';
   if (shortageItems.length === 1) {
-    summaryText = `${shortageItems[0].timeStart}–${shortageItems[0].timeEnd} ${shortageItems[0].deficit}名不足`;
+    summaryText = `${shortageItems[0].timeStart}–${shortageItems[0].timeEnd} ${shortageItems[0].deficit}名`;
   } else if (shortageItems.length > 1) {
-    summaryText = `${shortageItems[0].timeStart}〜 ${totalDeficit}名不足`;
+    summaryText = shortageItems.map(item => `${item.timeStart}–${item.timeEnd} -${item.deficit}名`).join(' / ');
   }
 
   return {

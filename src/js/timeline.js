@@ -4,7 +4,7 @@ import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 import { openShiftCreationModal, runAutoScheduler } from './scheduler.js';
 import { renderLaborCostPanel } from './costs.js';
 import { exportSchedulePNG } from './export.js';
-import { calculateDayShortages, calculateManagerSummary, formatCurrency, renderMiniShortageBar, generateUUID } from './utils.js';
+import { calculateDayShortages, calculateManagerSummary, formatCurrency, generateUUID } from './utils.js';
 import { renderSubmissionStatusPanel, openMonthlyRequestManagerModal } from './request.js';
 import { openSpecificDateOverrideModal } from './settings.js';
 import { openDayAvailabilityEditor } from './availability.js';
@@ -21,7 +21,6 @@ function minutesToTimeString(mins) {
 export function renderManagerWorkspaceView(state) {
   const isMonthView = state.managerViewMode === 'month';
   const summary = calculateManagerSummary(state);
-  const [yearStr, monthStr] = state.currentMonthKey.split('-');
 
   return `
     <div style="display:flex; flex-direction:column; gap:var(--space-4);">
@@ -109,7 +108,7 @@ function renderManagerMonthView(state) {
     const isSelected = state.selectedDate === dateKey;
     const dayShortage = calculateDayShortages(dateKey, state);
 
-    // Staff availability list for this day
+    // Staff availability list for this day with 3–4px staff-color vertical marker and subtle tint
     const dayAvails = (state.availability || []).filter(a => a.date === dateKey);
 
     const staffAvailRows = activeStaffMembers.map(m => {
@@ -123,39 +122,35 @@ function renderManagerMonthView(state) {
       else if (av.state === 'until') timeLabel = `〜${av.start_time || '18:00'}`;
       else if (av.state === 'unavailable') timeLabel = '×';
 
-      return {
-        member: m,
-        timeLabel
-      };
+      return { member: m, timeLabel };
     }).filter(Boolean);
 
     const visibleStaff = staffAvailRows.slice(0, 3);
     const hiddenCount = Math.max(0, staffAvailRows.length - 3);
 
     const visibleStaffHTML = visibleStaff.map(s => `
-      <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.65rem; font-weight:700; background:var(--color-surface-subtle); padding:1px 4px; border-radius:1px; overflow:hidden;">
-        <div style="display:flex; align-items:center; gap:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          <span class="timeline-staff-dot" style="background:${s.member.color}; width:6px; height:6px;"></span>
-          <span style="overflow:hidden; text-overflow:ellipsis;">${s.member.name.split(' ')[0]}</span>
-        </div>
-        <span style="color:var(--color-text-secondary); font-size:0.6rem;">${s.timeLabel}</span>
+      <div class="staff-avail-row" style="border-left-color:${s.member.color}; background:${s.member.color}12;">
+        <span class="staff-avail-name">${s.member.name.split(' ')[0]}</span>
+        <span class="staff-avail-time">${s.timeLabel}</span>
       </div>
     `).join('');
 
-    // Shortage display logic
-    let shortageHTML = '';
+    // Single consolidated shortage section per date
+    let consolidatedShortageHTML = '';
     if (dayShortage.hasShortage) {
-      const isProvisional = dayShortage.isProvisional;
-      shortageHTML = `
-        <div style="display:flex; flex-direction:column; gap:2px; margin-top:2px;">
-          ${isProvisional ? `<span style="font-size:0.6rem; font-weight:800; color:var(--color-warning);">現時点</span>` : ''}
-          ${dayShortage.shortageItems.map(item => `
-            <div style="font-size:0.625rem; font-weight:800; color:var(--color-danger); background:var(--color-danger-bg); border-left:2px solid var(--color-danger); padding:1px 3px;">
-              ${item.timeStart}–${item.timeEnd} ${item.deficit}名不足
-              ${item.noAvailableStaff ? `<span style="font-size:0.55rem; color:var(--color-text-muted); display:block;">勤務可能者なし</span>` : ''}
-            </div>
-          `).join('')}
-          ${dayShortage.unenteredCount > 0 ? `<span style="font-size:0.6rem; color:var(--color-text-muted);">未入力 ${dayShortage.unenteredCount}人</span>` : ''}
+      const titleText = dayShortage.isProvisional ? '現時点の不足' : '不足';
+      const shortageListHTML = dayShortage.shortageItems.map(item => `
+        <div class="shortage-row-item">
+          <span>${item.timeStart}–${item.timeEnd}</span>
+          <strong class="shortage-count-text">${item.deficit}名</strong>
+        </div>
+      `).join('');
+
+      consolidatedShortageHTML = `
+        <div class="consolidated-shortage-box">
+          <div class="shortage-header-title">${titleText}</div>
+          <div class="shortage-items-list">${shortageListHTML}</div>
+          ${dayShortage.unenteredCount > 0 ? `<div class="shortage-unentered-text">未入力 ${dayShortage.unenteredCount}人</div>` : ''}
         </div>
       `;
     }
@@ -167,20 +162,20 @@ function renderManagerMonthView(state) {
           <span class="calendar-cell-num ${isWeekend ? 'weekend' : ''}">
             ${day}<small class="calendar-cell-dayofweek">(${dayOfWeek})</small>
           </span>
-          <span style="font-size:0.65rem; font-weight:700; color:var(--color-text-muted);">
+          <span style="font-size:0.675rem; font-weight:700; color:var(--color-text-muted);">
             入力 ${dayShortage.enteredCount} / ${dayShortage.totalExpectedCount}
           </span>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px;">
+        <div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">
           ${visibleStaffHTML}
-          ${hiddenCount > 0 ? `<div style="font-size:0.6rem; font-weight:700; color:var(--color-text-muted); text-align:right;">+${hiddenCount}人</div>` : ''}
+          ${hiddenCount > 0 ? `<div style="font-size:0.65rem; font-weight:700; color:var(--color-text-muted); text-align:right;">+${hiddenCount}人</div>` : ''}
         </div>
 
-        ${shortageHTML}
+        ${consolidatedShortageHTML}
 
-        <div style="margin-top:auto; display:flex; justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm date-override-btn" data-date="${dateKey}" style="font-size:0.6rem; padding:0 4px; border:none; color:var(--color-text-muted);">
+        <div style="margin-top:auto; display:flex; justify-content:flex-end; padding-top:4px;">
+          <button class="btn btn-secondary btn-sm date-override-btn" data-date="${dateKey}" style="font-size:0.625rem; padding:0 4px; border:none; color:var(--color-text-muted);">
             この日の人員設定
           </button>
         </div>
@@ -190,22 +185,22 @@ function renderManagerMonthView(state) {
     // Mobile (iPhone) Operational Date List Item
     mobileDateListHTML += `
       <div class="settings-row ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}" style="cursor:pointer; padding:12px 14px;">
-        <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+        <div style="display:flex; flex-direction:column; gap:6px; flex:1;">
           <div style="display:flex; align-items:center; justify-content:space-between;">
             <strong style="font-size:0.9rem;">${year}年${monthIndex + 1}月${day}日（${dayOfWeek}）</strong>
             <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-muted);">入力 ${dayShortage.enteredCount} / ${dayShortage.totalExpectedCount}人</span>
           </div>
 
-          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
-            ${visibleStaffHTML || `<span style="font-size:0.725rem; color:var(--color-text-muted);">入力なし</span>`}
+          <div style="display:flex; flex-wrap:wrap; gap:4px;">
+            ${visibleStaffHTML || `<span style="font-size:0.75rem; color:var(--color-text-muted);">入力なし</span>`}
           </div>
 
           ${dayShortage.hasShortage ? `
-            <div style="font-size:0.75rem; font-weight:800; color:var(--color-danger); margin-top:2px;">
-              ${dayShortage.isProvisional ? '【現時点】 ' : ''}${dayShortage.shortageItems.map(item => `${item.timeStart}–${item.timeEnd} ${item.deficit}名不足`).join(' / ')}
+            <div style="font-size:0.75rem; font-weight:800; color:var(--color-danger);">
+              ${dayShortage.isProvisional ? '【現時点の不足】 ' : '【不足】 '}${dayShortage.summaryText}
             </div>
           ` : `
-            <div style="font-size:0.725rem; font-weight:700; color:var(--color-success); margin-top:2px;">適正配置</div>
+            <div style="font-size:0.725rem; font-weight:700; color:var(--color-success);">適正配置</div>
           `}
         </div>
         <span style="font-size:0.8rem; color:var(--color-text-muted); margin-left:8px;">＞</span>
@@ -247,7 +242,6 @@ function renderManagerDayTimelineView(state) {
 
   const dayShortage = calculateDayShortages(selectedDate, state);
 
-  // Hour column headers
   const hourCols = [];
   for (let m = storeOpenMinutes; m <= storeCloseMinutes; m += 60) {
     hourCols.push(Math.floor(m / 60));
@@ -255,7 +249,6 @@ function renderManagerDayTimelineView(state) {
 
   const hourHeadersHTML = hourCols.map(h => `<div class="timeline-hour-head">${h}:00</div>`).join('');
 
-  // Coverage Strip calculations
   const coverageCellsHTML = hourCols.map(h => {
     const slotStartM = h * 60;
     const slotEndM = slotStartM + 60;
@@ -288,7 +281,6 @@ function renderManagerDayTimelineView(state) {
     `;
   }).join('');
 
-  // Staff Timeline Rows
   const staffRowsHTML = state.members.map(member => {
     const avail = state.availability.find(a => a.member_id === member.id && a.date === selectedDate);
     const asgs = state.assignments.filter(a => a.member_id === member.id && a.date === selectedDate);
@@ -299,7 +291,6 @@ function renderManagerDayTimelineView(state) {
       totalMonthlyHours += Math.max(0, dur);
     });
 
-    // Translucent availability layer
     let availBlockHTML = '';
     if (avail && avail.state !== 'unavailable' && avail.state !== 'unset') {
       let startM = storeOpenMinutes;
@@ -320,7 +311,6 @@ function renderManagerDayTimelineView(state) {
       `;
     }
 
-    // Solid assignment shift blocks
     const shiftBlocksHTML = asgs.map(asg => {
       const startM = parseTimeMinutes(asg.start_time);
       const endM = parseTimeMinutes(asg.end_time);
@@ -425,7 +415,6 @@ export function setupTimelineEvents(stateManager) {
     });
   }
 
-  // Calendar cells in Month View
   const mgrMonthCells = document.querySelectorAll('[data-mgr-date]');
   mgrMonthCells.forEach(cell => {
     cell.addEventListener('click', (e) => {
@@ -468,7 +457,6 @@ export function setupTimelineEvents(stateManager) {
     });
   });
 
-  // Track manipulation
   const state = stateManager.state;
   const storeOpenMinutes = parseTimeMinutes(state.store ? state.store.default_open_time : '09:00');
   const storeCloseMinutes = parseTimeMinutes(state.store ? state.store.default_close_time : '21:30');
@@ -528,7 +516,6 @@ export function setupTimelineEvents(stateManager) {
     });
   });
 
-  // Shift block direct drag move / resize handle manipulation
   const shiftBlocks = document.querySelectorAll('.shift-block-layer');
   shiftBlocks.forEach(block => {
     const asgId = block.getAttribute('data-asg-id');

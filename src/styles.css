@@ -486,9 +486,9 @@ html, body {
 }
 
 .calendar-cell {
-  min-height: 104px;
+  min-height: 120px;
   background: #ffffff;
-  padding: 8px var(--space-2);
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -508,7 +508,7 @@ html, body {
 }
 
 .calendar-cell.has-shortage {
-  background: #fffafa;
+  background: #fffdfd;
 }
 
 .calendar-cell-top {
@@ -534,6 +534,81 @@ html, body {
   margin-left: 2px;
 }
 
+/* Staff Personal Color Identity Rows in Month Calendar */
+.staff-avail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px;
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-radius: var(--radius-xs);
+  font-size: 0.675rem;
+  line-height: 1.3;
+}
+
+.staff-avail-name {
+  font-weight: 800;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-avail-time {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: 0.625rem;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* Consolidated Single Shortage Box per Date */
+.consolidated-shortage-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border-left: 2px solid var(--color-danger);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-xs);
+}
+
+.shortage-header-title {
+  font-size: 0.625rem;
+  font-weight: 900;
+  color: var(--color-danger);
+  letter-spacing: -0.01em;
+}
+
+.shortage-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.shortage-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.shortage-count-text {
+  font-weight: 900;
+  color: var(--color-danger-text);
+}
+
+.shortage-unentered-text {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+
 /* Concise Operational Text Availability Display */
 .avail-text {
   font-size: 0.75rem;
@@ -550,25 +625,6 @@ html, body {
 .avail-text-undecided { color: var(--color-text-muted); font-weight: 500; }
 
 /* Shortage Indicators in Manager Month Cell */
-.cell-shortage-box {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 4px 0;
-}
-
-.shortage-slot-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: var(--color-danger-text);
-  background: var(--color-danger-bg);
-  border-left: 3px solid var(--color-danger);
-  padding: 2px 4px;
-}
-
 .shortage-mini-bar {
   height: 4px;
   background: var(--color-border-subtle);
@@ -1116,10 +1172,6 @@ html, body {
   .calendar-cell {
     min-height: 72px;
     padding: 4px;
-  }
-
-  .cell-shortage-box {
-    display: none;
   }
 
   .workspace-header-strip {
