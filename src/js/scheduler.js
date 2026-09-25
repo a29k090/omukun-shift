@@ -1,4 +1,4 @@
-// Shift Creation, Contextual Staff Selector, and Smart Heuristic Scheduler ("AIで仮シフトを作成")
+// Shift Creation, Contextual Staff Selector, and Smart Scheduler ("仮シフトを作成")
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 import { generateUUID } from './utils.js';
 import { calculateDurationHours } from './dates.js';
@@ -11,67 +11,58 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
 
     let availLabel = '未入力';
     let isAvailable = true;
-    let badgeClass = 'state-unset';
 
     if (avail) {
       if (avail.state === 'full') {
-        availLabel = '終日OK';
-        badgeClass = 'state-full';
+        availLabel = '終日';
       } else if (avail.state === 'until') {
-        availLabel = `${avail.start_time || '○'}時まで`;
-        badgeClass = 'state-until';
+        availLabel = `〜${avail.start_time || '18:00'}`;
       } else if (avail.state === 'from') {
-        availLabel = `${avail.start_time || '○'}時から`;
-        badgeClass = 'state-from';
+        availLabel = `${avail.start_time || '12:00'}〜`;
       } else if (avail.state === 'range') {
-        availLabel = `${avail.start_time || '○'}〜${avail.end_time || '○'}`;
-        badgeClass = 'state-range';
+        availLabel = `${avail.start_time || '09:30'}–${avail.end_time || '18:30'}`;
       } else if (avail.state === 'unavailable') {
         availLabel = '出勤不可';
         isAvailable = false;
-        badgeClass = 'state-unavailable';
       }
     }
 
     const isSelected = m.id === defaultMemberId;
 
     return `
-      <div class="staff-select-item ${!isAvailable ? 'disabled' : ''} ${isSelected ? 'selected' : ''}" data-staff-id="${m.id}" data-available="${isAvailable}">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span class="staff-dot" style="background:${m.color};"></span>
-          <div>
-            <div style="font-weight:700; font-size:0.875rem;">${m.name}</div>
-            <div style="font-size:0.725rem; color:var(--color-text-muted);">${m.role === 'admin' ? '管理者' : 'スタッフ'}</div>
-          </div>
+      <div class="radio-select-row ${isSelected ? 'selected' : ''}" data-staff-id="${m.id}" data-available="${isAvailable}">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="timeline-staff-dot" style="background:${m.color};"></span>
+          <span style="font-weight:700; font-size:0.85rem;">${m.name}</span>
         </div>
-        <span class="calendar-day-status ${badgeClass}">${availLabel}</span>
+        <span style="font-size:0.75rem; color:${isAvailable ? 'var(--color-text-secondary)' : 'var(--color-danger)'};">${availLabel}</span>
       </div>
     `;
   }).join('');
 
   const contentHTML = `
-    <form id="create-shift-form" class="form-group" style="gap:var(--space-4);">
-      <div style="font-size:0.85rem; color:var(--color-text-secondary); background:var(--color-surface-subtle); padding:var(--space-2) var(--space-3); border-radius:var(--radius-sm);">
-        対象日: <strong style="color:var(--color-text);">${date}</strong>
+    <form id="create-shift-form" class="form-group" style="gap:var(--space-3);">
+      <div style="font-size:0.95rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
+        シフト配置 (${date})
       </div>
 
       <div class="form-group">
-        <label class="form-label">配置スタッフ選択（希望シフト一覧）</label>
-        <div style="display:flex; flex-direction:column; gap:var(--space-2); max-height:220px; overflow-y:auto; padding-right:4px;">
+        <label class="form-label">スタッフ選択</label>
+        <div class="radio-select-group" style="max-height:180px; overflow-y:auto;">
           ${staffListHTML}
         </div>
         <input type="hidden" id="selected-staff-id" value="${defaultMemberId || (state.members[0] ? state.members[0].id : '')}" />
       </div>
 
       <div class="form-group">
-        <label class="form-label">シフトプリセットから自動入力 (任意)</label>
+        <label class="form-label">時間プリセット</label>
         <select id="preset-selector" class="form-select">
-          <option value="">カスタム時間指定</option>
-          ${state.presets.map(p => `<option value="${p.id}">${p.name} (${p.start_time}-${p.end_time})</option>`).join('')}
+          <option value="">指定なし</option>
+          ${state.presets.map(p => `<option value="${p.id}">${p.name} (${p.start_time}–${p.end_time})</option>`).join('')}
         </select>
       </div>
 
-      <div style="display:flex; gap:var(--space-3);">
+      <div style="display:flex; gap:var(--space-2);">
         <div class="form-group" style="flex:1;">
           <label class="form-label">開始時間</label>
           <input type="time" id="shift-start-time" class="form-input" value="09:30" step="900" required />
@@ -89,27 +80,23 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
 
       <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">シフトを配置</button>
+        <button type="submit" class="btn btn-primary">配置する</button>
       </div>
     </form>
   `;
 
   createBottomSheet({
-    title: '新規シフト配置作成',
+    title: '',
     contentHTML,
     onOpen: (body) => {
       const hiddenStaffInput = body.querySelector('#selected-staff-id');
-      const staffItems = body.querySelectorAll('.staff-select-item');
+      const staffRows = body.querySelectorAll('.radio-select-row');
 
-      staffItems.forEach(item => {
-        item.addEventListener('click', () => {
-          const isAvail = item.getAttribute('data-available') === 'true';
-          if (!isAvail) {
-            showToast('⚠️ 該当スタッフは出勤不可希望を提出しています');
-          }
-          staffItems.forEach(i => i.style.borderColor = 'var(--color-border)');
-          item.style.borderColor = 'var(--color-accent-black)';
-          hiddenStaffInput.value = item.getAttribute('data-staff-id');
+      staffRows.forEach(row => {
+        row.addEventListener('click', () => {
+          staffRows.forEach(r => r.classList.remove('selected'));
+          row.classList.add('selected');
+          hiddenStaffInput.value = row.getAttribute('data-staff-id');
         });
       });
 
@@ -151,13 +138,13 @@ export function openShiftCreationModal(stateManager, defaultMemberId, date) {
         });
 
         closeBottomSheet();
-        showToast('新しいシフトを作成しました');
+        showToast('シフトを作成しました');
       });
     }
   });
 }
 
-// Client-side Heuristic Auto Scheduler
+// Client-side Scheduler ("仮シフトを作成")
 export function runAutoScheduler(stateManager) {
   const state = stateManager.state;
   const currentMonthKey = state.currentMonthKey;
@@ -166,29 +153,33 @@ export function runAutoScheduler(stateManager) {
   if (!period) return;
 
   const contentHTML = `
-    <div class="form-group" style="gap:var(--space-4);">
-      <p style="font-size:0.875rem; color:var(--color-text-secondary); line-height:1.6;">
-        提出された希望シフト・必要人員体制（時間帯別不足）・労働時間上限・プリセットを考慮し、最適な仮シフト案を自動計算して作成します。
+    <div class="form-group" style="gap:var(--space-3);">
+      <div style="font-size:0.95rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
+        仮シフトの作成
+      </div>
+
+      <p style="font-size:0.825rem; color:var(--color-text-secondary); line-height:1.5;">
+        希望シフト・時間帯別の必要人数・月間勤務上限をもとに、仮シフトを自動作成します。
       </p>
 
-      <div style="background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-md); display:flex; flex-direction:column; gap:var(--space-2);">
-        <label style="font-size:0.85rem; font-weight:700; color:var(--color-text); cursor:pointer;">
-          <input type="checkbox" id="opt-ignore-unset" checked /> 未入力スタッフを自動生成から除外する
+      <div style="background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-xs); display:flex; flex-direction:column; gap:var(--space-2);">
+        <label style="font-size:0.825rem; font-weight:700; color:var(--color-text); cursor:pointer;">
+          <input type="checkbox" id="opt-ignore-unset" checked /> 未入力スタッフを除外する
         </label>
-        <label style="font-size:0.85rem; font-weight:700; color:var(--color-text); cursor:pointer;">
+        <label style="font-size:0.825rem; font-weight:700; color:var(--color-text); cursor:pointer;">
           <input type="checkbox" id="opt-keep-existing" checked /> 既存の作成済みシフトを保持する
         </label>
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="button" id="start-auto-schedule-btn" class="btn btn-accent">仮案を自動生成</button>
+        <button type="button" id="start-auto-schedule-btn" class="btn btn-primary">仮シフトを作成</button>
       </div>
     </div>
   `;
 
   createBottomSheet({
-    title: '✨ AI自動シフト生成',
+    title: '',
     contentHTML,
     onOpen: (body) => {
       body.querySelector('#start-auto-schedule-btn').addEventListener('click', async () => {
@@ -196,7 +187,7 @@ export function runAutoScheduler(stateManager) {
         const keepExisting = body.querySelector('#opt-keep-existing').checked;
 
         closeBottomSheet();
-        showToast('仮シフトを自動生成中…');
+        showToast('仮シフトを作成中…');
 
         const newAssignments = keepExisting ? [...state.assignments] : [];
 
@@ -264,7 +255,7 @@ export function runAutoScheduler(stateManager) {
         }
 
         await stateManager.replaceAssignments(newAssignments);
-        showToast(`✨ 仮シフト案を作成しました (+${addedCount}件)`);
+        showToast(`仮シフトを作成しました (+${addedCount}件)`);
       });
     }
   });

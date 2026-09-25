@@ -1,4 +1,4 @@
-// Labor Cost & Staff Constraint Inspector Panel
+// Labor Cost & Staff Constraint Panel ("スタッフ別勤務状況")
 import { calculateDurationHours } from './dates.js';
 import { formatCurrency } from './utils.js';
 
@@ -20,12 +20,14 @@ export function renderLaborCostPanel(state) {
     const memberCost = memberHours * (member.hourly_rate || 1100);
     totalEstimatedCost += memberCost;
 
-    // Constraint warnings
-    let warningBadge = '';
+    // Constraint status description
+    let constraintText = '';
     if (member.max_monthly_hours && memberHours > member.max_monthly_hours) {
-      warningBadge = `<span style="background:var(--color-danger-bg); color:var(--color-danger-text); border:1px solid var(--color-danger-border); padding:1px 5px; border-radius:2px; font-size:0.7rem; font-weight:700;">⚠️ 上限超過 (${memberHours.toFixed(1)} / ${member.max_monthly_hours}h)</span>`;
+      const over = (memberHours - member.max_monthly_hours).toFixed(1);
+      constraintText = `<span style="color:var(--color-danger); font-size:0.725rem; font-weight:700;">上限より${over}h超過</span>`;
     } else if (member.min_monthly_hours && memberHours < member.min_monthly_hours) {
-      warningBadge = `<span style="background:var(--color-warning-bg); color:var(--color-warning); border:1px solid var(--color-warning-border); padding:1px 5px; border-radius:2px; font-size:0.7rem; font-weight:700;">⚠️ 最低未達 (${memberHours.toFixed(1)} / ${member.min_monthly_hours}h)</span>`;
+      const needed = (member.min_monthly_hours - memberHours).toFixed(1);
+      constraintText = `<span style="color:var(--color-text-muted); font-size:0.725rem;">最低${member.min_monthly_hours}hまであと${needed}h</span>`;
     }
 
     return `
@@ -35,10 +37,10 @@ export function renderLaborCostPanel(state) {
           <strong style="font-weight:700; font-size:0.825rem;">${member.name}</strong>
           <span style="font-size:0.725rem; color:var(--color-text-muted);">時給 ${formatCurrency(member.hourly_rate || 1100)}</span>
         </div>
-        <div style="display:flex; align-items:center; gap:12px;">
-          ${warningBadge}
-          <span style="font-weight:800; font-size:0.825rem;">${memberHours.toFixed(1)}h</span>
-          <span style="color:var(--color-text-secondary); width:80px; text-align:right; font-weight:600; font-size:0.825rem;">${formatCurrency(memberCost)}</span>
+        <div style="display:flex; align-items:center; gap:16px;">
+          ${constraintText}
+          <span style="font-weight:800; font-size:0.825rem; min-width:48px; text-align:right;">${memberHours.toFixed(1)}h</span>
+          <span style="color:var(--color-text-secondary); min-width:70px; text-align:right; font-weight:600; font-size:0.825rem;">${formatCurrency(memberCost)}</span>
         </div>
       </div>
     `;
@@ -48,12 +50,11 @@ export function renderLaborCostPanel(state) {
     <div class="settings-group">
       <div class="settings-row" style="background:var(--color-surface-subtle); border-bottom:1px solid var(--color-border);">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-weight:800; font-size:0.85rem;">労働時間・人件費インスペクター</span>
-          <span style="font-size:0.725rem; color:var(--color-text-muted); font-weight:600;">(月間合計)</span>
+          <span style="font-weight:800; font-size:0.85rem;">スタッフ別勤務状況</span>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
-          <span style="font-size:0.85rem; font-weight:800; color:var(--color-accent-black);">${formatCurrency(totalEstimatedCost)}</span>
-          <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-secondary);">(${totalMonthlyHours.toFixed(1)}時間)</span>
+          <span style="font-size:0.85rem; font-weight:800; color:var(--color-text);">${formatCurrency(totalEstimatedCost)}</span>
+          <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-secondary);">(${totalMonthlyHours.toFixed(1)}h)</span>
         </div>
       </div>
       ${staffSummaries}

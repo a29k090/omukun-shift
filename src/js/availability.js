@@ -1,4 +1,4 @@
-// Staff Availability Calendar Component and Refactored Interactions
+// Staff Availability Calendar Component and Clean Input Interactions
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 
@@ -11,6 +11,7 @@ export function renderStaffAvailabilityView(state) {
   const [yearStr, monthStr] = state.currentMonthKey.split('-');
   const year = parseInt(yearStr, 10);
   const monthIndex = parseInt(monthStr, 10) - 1;
+  const month = monthIndex + 1;
   const daysInMonth = getDaysInMonth(year, monthIndex);
 
   // Map member's availability entries
@@ -20,22 +21,25 @@ export function renderStaffAvailabilityView(state) {
     .forEach(a => memberAvailMap.set(a.date, a));
 
   let enteredDays = 0;
-  let unsetDays = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const entry = memberAvailMap.get(dateKey);
     if (entry && entry.state && entry.state !== 'unset') {
       enteredDays++;
-    } else {
-      unsetDays++;
     }
   }
 
   // Formatting deadline
-  const deadlineFormatted = state.period
-    ? state.period.deadline.replace('T', ' ').substring(0, 16)
-    : '2026/09/25 23:59';
+  let deadlineFormatted = '9月25日 23:59';
+  if (state.period && state.period.deadline) {
+    const dlStr = state.period.deadline.replace('T', ' ');
+    const parts = dlStr.split(' ');
+    const dateParts = parts[0].split('-');
+    if (dateParts.length === 3) {
+      deadlineFormatted = `${parseInt(dateParts[1], 10)}月${parseInt(dateParts[2], 10)}日 ${parts[1] ? parts[1].substring(0, 5) : '23:59'}`;
+    }
+  }
 
   // Generate calendar cells
   let calendarDaysHTML = '';
@@ -44,7 +48,7 @@ export function renderStaffAvailabilityView(state) {
     const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);
     const isWeekend = dayOfWeek === '土' || dayOfWeek === '日';
     const entry = memberAvailMap.get(dateKey) || { state: 'unset' };
-    const tag = getAvailTagHTML(entry);
+    const tag = getAvailTextHTML(entry);
     const isSelected = multiSelectActive ? selectedDatesSet.has(dateKey) : state.selectedDate === dateKey;
 
     calendarDaysHTML += `
@@ -62,55 +66,41 @@ export function renderStaffAvailabilityView(state) {
     `;
   }
 
-  // Multi-select toolbar if active
+  // Multi-select toolbar if active and dates selected
   const multiselectBarHTML = (multiSelectActive && selectedDatesSet.size > 0) ? `
     <div class="multiselect-bar">
-      <span style="font-weight:700; font-size:0.8rem;">${selectedDatesSet.size}日 選択中</span>
+      <span style="font-weight:800; font-size:0.85rem;">${selectedDatesSet.size}日 選択中</span>
       <div style="display:flex; gap:var(--space-2);">
         <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="full">終日</button>
+        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="range">時間指定</button>
         <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="unavailable">出勤不可</button>
-        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="unset">クリア</button>
+        <button class="btn btn-secondary btn-sm bulk-apply-btn" data-bulk-state="unset">未定</button>
       </div>
     </div>
   ` : '';
 
   return `
     <div style="display:flex; flex-direction:column; gap:var(--space-4);">
-      <!-- Compact Editorial Metadata Header Strip -->
-      <div class="workspace-header-strip">
-        <div class="header-strip-meta">
-          <div class="header-strip-item">
-            <span class="header-strip-label">対象月</span>
-            <span class="header-strip-value">${year}年${monthIndex + 1}月 希望シフト</span>
-          </div>
-          <div class="header-strip-divider"></div>
-          <div class="header-strip-item">
-            <span class="header-strip-label">提出期限</span>
-            <span class="header-strip-value">${deadlineFormatted}</span>
-          </div>
-          <div class="header-strip-divider"></div>
-          <div class="header-strip-item">
-            <span class="header-strip-label">入力状況</span>
-            <span class="header-strip-value ${unsetDays > 0 ? 'highlight-danger' : 'highlight-success'}">
-              ${enteredDays} / ${daysInMonth}日 入力済み
-            </span>
-          </div>
+      <!-- Clean Typography Header -->
+      <div style="display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:var(--space-3); border-bottom:1px solid var(--color-border); padding-bottom:var(--space-3);">
+        <div>
+          <h1 style="font-size:1.5rem; font-weight:900; letter-spacing:-0.02em; color:var(--color-text);">${month}月の希望シフト</h1>
         </div>
 
-        <div style="display:flex; align-items:center; gap:var(--space-2);">
-          <button id="multi-select-toggle-btn" class="btn ${multiSelectActive ? 'btn-active' : 'btn-secondary'} btn-sm">
-            ${multiSelectActive ? '✕ 選択終了' : '☑ 複数選択'}
-          </button>
+        <div style="display:flex; align-items:center; gap:var(--space-3); font-size:0.825rem; color:var(--color-text-secondary);">
+          <span>提出期限 <strong style="color:var(--color-text); font-weight:800;">${deadlineFormatted}</strong></span>
+          <span style="color:var(--color-border);">|</span>
+          <span>進捗 <strong style="color:var(--color-text); font-weight:800;">${enteredDays} / ${daysInMonth}日入力済み</strong></span>
         </div>
       </div>
 
       <!-- Main Calendar Grid Table -->
       <div class="calendar-surface">
         <div class="calendar-surface-header">
-          <span style="font-weight:800; font-size:0.95rem;">${year}年${monthIndex + 1}月 カレンダー</span>
-          <span style="font-size:0.75rem; color:var(--color-text-muted);">
-            ${multiSelectActive ? '日付をタップして複数選択してください' : '日付をタップして勤務可能時間を設定'}
-          </span>
+          <span style="font-weight:800; font-size:0.9rem;">${year}年${month}月 カレンダー</span>
+          <button id="multi-select-toggle-btn" class="btn ${multiSelectActive ? 'btn-active' : 'btn-secondary'} btn-sm">
+            ${multiSelectActive ? '✕ 選択終了' : '☑ 複数選択'}
+          </button>
         </div>
 
         <div class="calendar-grid-table">
@@ -130,21 +120,23 @@ export function renderStaffAvailabilityView(state) {
   `;
 }
 
-function getAvailTagHTML(entry) {
+function getAvailTextHTML(entry) {
+  if (!entry || !entry.state || entry.state === 'unset') {
+    return `<div class="avail-text avail-text-undecided">未定</div>`;
+  }
   switch (entry.state) {
     case 'full':
-      return `<div class="avail-tag avail-tag-full">終日OK</div>`;
+      return `<div class="avail-text avail-text-full">終日</div>`;
     case 'until':
-      return `<div class="avail-tag avail-tag-until">〜${entry.start_time || '18:00'}</div>`;
+      return `<div class="avail-text avail-text-until">〜${entry.start_time || '18:00'}</div>`;
     case 'from':
-      return `<div class="avail-tag avail-tag-from">${entry.start_time || '12:00'}〜</div>`;
+      return `<div class="avail-text avail-text-from">${entry.start_time || '12:00'}〜</div>`;
     case 'range':
-      return `<div class="avail-tag avail-tag-range">${entry.start_time || '09:30'}–${entry.end_time || '18:30'}</div>`;
+      return `<div class="avail-text avail-text-range">${entry.start_time || '09:30'}–${entry.end_time || '18:30'}</div>`;
     case 'unavailable':
-      return `<div class="avail-tag avail-tag-unavailable">× 不可</div>`;
-    case 'unset':
+      return `<div class="avail-text avail-text-unavailable">×</div>`;
     default:
-      return `<div class="avail-tag avail-tag-unset">未入力</div>`;
+      return `<div class="avail-text avail-text-undecided">未定</div>`;
   }
 }
 
@@ -190,13 +182,13 @@ export function setupAvailabilityEvents(stateManager) {
         member_id: currentMember.id,
         date: d,
         state: targetState,
-        start_time: null,
-        end_time: null,
+        start_time: targetState === 'range' ? '09:30' : null,
+        end_time: targetState === 'range' ? '18:30' : null,
         notes: ''
       }));
 
       await stateManager.saveBulkAvailability(entries);
-      showToast(`${entries.length}日分の希望を一括保存しました`);
+      showToast(`${entries.length}日分の希望を保存しました`);
       selectedDatesSet.clear();
       multiSelectActive = false;
       stateManager.notify();
@@ -218,18 +210,15 @@ function openDayAvailabilityEditor(stateManager, date) {
   const dayOfWeek = getJapaneseDayOfWeek(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
 
   const radioOptions = [
-    { value: 'full', label: '終日OK', desc: '開所全時間帯勤務可能' },
-    { value: 'range', label: '時間指定', desc: '勤務可能な時間帯を指定' },
-    { value: 'unavailable', label: '出勤不可', desc: 'この日はシフトに入れません' },
-    { value: 'unset', label: '未設定（リセット）', desc: '未入力状態に戻します' }
+    { value: 'full', label: '○ 終日' },
+    { value: 'range', label: '○ 時間を指定' },
+    { value: 'unavailable', label: '○ 出勤できない' },
+    { value: 'unset', label: '○ 未定' }
   ];
 
   const radioRowsHTML = radioOptions.map(opt => `
     <div class="radio-select-row ${existing.state === opt.value ? 'selected' : ''}" data-val="${opt.value}">
-      <div>
-        <div style="font-size:0.85rem; font-weight:700;">${opt.label}</div>
-        <div style="font-size:0.7rem; color:var(--color-text-muted);">${opt.desc}</div>
-      </div>
+      <span style="font-size:0.875rem; font-weight:700;">${opt.label}</span>
       <div class="radio-indicator"></div>
     </div>
   `).join('');
@@ -238,35 +227,37 @@ function openDayAvailabilityEditor(stateManager, date) {
 
   const contentHTML = `
     <form id="day-avail-form" class="form-group" style="gap:var(--space-3);">
-      <div style="font-size:1rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
-        ${parseInt(m, 10)}月${parseInt(d, 10)}日 (${dayOfWeek}) の勤務希望
+      <div style="font-size:1.1rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
+        ${parseInt(m, 10)}月${parseInt(d, 10)}日（${dayOfWeek}）
       </div>
+
+      <div style="font-size:0.75rem; font-weight:800; color:var(--color-text-secondary); margin-top:4px;">勤務できる時間</div>
 
       <div class="radio-select-group" id="avail-radio-group">
         ${radioRowsHTML}
       </div>
       <input type="hidden" id="avail-state-input" value="${existing.state}" />
 
-      <div id="time-range-box" style="display:${isTimeRequired ? 'flex' : 'none'}; gap:var(--space-2); align-items:center; background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-sm);">
+      <div id="time-range-box" style="display:${isTimeRequired ? 'flex' : 'none'}; gap:var(--space-2); align-items:center; background:var(--color-surface-subtle); padding:var(--space-3); border-radius:var(--radius-xs);">
         <div class="form-group" style="flex:1;">
-          <label class="form-label">開始時間</label>
+          <label class="form-label">開始</label>
           <input type="time" id="avail-start-time" class="form-input" value="${existing.start_time || '09:30'}" step="900" />
         </div>
         <span style="font-weight:700; color:var(--color-text-muted); margin-top:16px;">→</span>
         <div class="form-group" style="flex:1;">
-          <label class="form-label">終了時間</label>
+          <label class="form-label">終了</label>
           <input type="time" id="avail-end-time" class="form-input" value="${existing.end_time || '18:30'}" step="900" />
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">備考・コメント（任意）</label>
-        <input type="text" id="avail-notes" class="form-input" placeholder="例: 18時以降のみ可能" value="${existing.notes || ''}" />
+        <label class="form-label">備考</label>
+        <input type="text" id="avail-notes" class="form-input" placeholder="例: 大学の授業後なら勤務可能" value="${existing.notes || ''}" />
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-2);">
         <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-        <button type="submit" class="btn btn-primary">完了・保存</button>
+        <button type="submit" class="btn btn-primary">保存</button>
       </div>
     </form>
   `;

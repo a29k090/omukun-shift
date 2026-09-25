@@ -1,10 +1,18 @@
-// Manager Workspace - Month View & Day Timeline Modes
+// Manager Workspace - Month View & Day Timeline Modes with Direct Manipulation
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek, parseTimeMinutes } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 import { openShiftCreationModal, runAutoScheduler } from './scheduler.js';
 import { renderLaborCostPanel } from './costs.js';
 import { exportSchedulePNG } from './export.js';
-import { calculateDayShortages, calculateManagerSummary, formatCurrency, renderMiniShortageBar } from './utils.js';
+import { calculateDayShortages, calculateManagerSummary, formatCurrency, renderMiniShortageBar, generateUUID } from './utils.js';
+
+let selectedShiftId = null;
+
+function minutesToTimeString(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
 
 export function renderManagerWorkspaceView(state) {
   const isMonthView = state.managerViewMode === 'month';
@@ -13,7 +21,7 @@ export function renderManagerWorkspaceView(state) {
 
   return `
     <div style="display:flex; flex-direction:column; gap:var(--space-4);">
-      <!-- Compact Editorial Production Status Strip (No Large KPI Cards) -->
+      <!-- Compact Professional Toolbar Strip -->
       <div class="workspace-header-strip">
         <div class="header-strip-meta">
           <div class="header-strip-item">
@@ -22,48 +30,51 @@ export function renderManagerWorkspaceView(state) {
           </div>
           <div class="header-strip-divider"></div>
           <div class="header-strip-item">
-            <span class="header-strip-label">提出数</span>
+            <span class="header-strip-label">提出</span>
             <span class="header-strip-value">${summary.submittedStaffCount} / ${summary.totalStaffCount}名</span>
           </div>
           <div class="header-strip-divider"></div>
           <div class="header-strip-item">
-            <span class="header-strip-label">不足検知</span>
+            <span class="header-strip-label">人員不足</span>
             <span class="header-strip-value ${summary.unresolvedDaysCount > 0 ? 'highlight-danger' : 'highlight-success'}">
-              ${summary.unresolvedDaysCount > 0 ? `${summary.unresolvedDaysCount}日 (${summary.totalShortageDeficit}枠不足)` : 'なし (充足)'}
+              ${summary.unresolvedDaysCount > 0 ? `${summary.unresolvedDaysCount}日` : '0日'}
             </span>
           </div>
           <div class="header-strip-divider"></div>
           <div class="header-strip-item">
-            <span class="header-strip-label">総勤務 / 人件費</span>
-            <span class="header-strip-value">${summary.totalScheduledHours.toFixed(1)}h · ${formatCurrency(summary.totalEstimatedCost)}</span>
+            <span class="header-strip-label">勤務</span>
+            <span class="header-strip-value">${summary.totalScheduledHours.toFixed(1)}h</span>
+          </div>
+          <div class="header-strip-divider"></div>
+          <div class="header-strip-item">
+            <span class="header-strip-label">人件費</span>
+            <span class="header-strip-value">${formatCurrency(summary.totalEstimatedCost)}</span>
           </div>
         </div>
 
         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2);">
           <div class="segmented-control">
-            <button id="mgr-mode-timeline-btn" class="segmented-btn ${!isMonthView ? 'active' : ''}">1日タイムライン</button>
-            <button id="mgr-mode-month-btn" class="segmented-btn ${isMonthView ? 'active' : ''}">月間全体図</button>
+            <button id="mgr-mode-month-btn" class="segmented-btn ${isMonthView ? 'active' : ''}">月間</button>
+            <button id="mgr-mode-timeline-btn" class="segmented-btn ${!isMonthView ? 'active' : ''}">1日</button>
           </div>
 
-          <div style="display:flex; align-items:center; gap:var(--space-1);">
-            <input type="date" id="mgr-date-picker" class="form-input" value="${state.selectedDate}" style="padding:3px 8px; font-weight:700; font-size:0.775rem;" />
-          </div>
+          <input type="date" id="mgr-date-picker" class="form-input" value="${state.selectedDate}" style="padding:2px 6px; font-weight:700; font-size:0.75rem;" />
 
-          <button id="ai-generate-btn" class="btn btn-accent btn-sm">✨ 仮シフト自動生成</button>
-          <button id="export-png-btn" class="btn btn-secondary btn-sm">📷 PNG出力</button>
+          <button id="ai-generate-btn" class="btn btn-primary btn-sm">仮シフトを作成</button>
+          <button id="export-png-btn" class="btn btn-secondary btn-sm">画像を書き出す</button>
         </div>
       </div>
 
       <!-- Main Workspace Working Surface -->
       ${isMonthView ? renderManagerMonthView(state) : renderManagerDayTimelineView(state)}
 
-      <!-- Manager Labor Cost & Constraint Table Panel -->
+      <!-- Staff Labor Status View -->
       ${renderLaborCostPanel(state)}
     </div>
   `;
 }
 
-// Manager Month View Component with Shortage Timelines & Slot Deficit Displays
+// Manager Month View Component
 function renderManagerMonthView(state) {
   const [yearStr, monthStr] = state.currentMonthKey.split('-');
   const year = parseInt(yearStr, 10);
@@ -87,7 +98,7 @@ function renderManagerMonthView(state) {
       ? renderMiniShortageBar(dayShortage.shortageItems)
       : '';
 
-    // Slot deficit text strips
+    // Shortage slot strips inside cell
     const shortageSlotsHTML = dayShortage.hasShortage ? `
       <div class="cell-shortage-box">
         ${dayShortage.shortageItems.map(item => `
@@ -99,15 +110,15 @@ function renderManagerMonthView(state) {
       </div>
     ` : '';
 
-    // Desktop/iPad Month Calendar Cell
+    // Desktop/iPad Calendar Cell
     monthGridHTML += `
       <div class="calendar-cell ${isSelected ? 'selected' : ''} ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}">
         <div class="calendar-cell-top">
           <span class="calendar-cell-num ${isWeekend ? 'weekend' : ''}">
             ${day}<small class="calendar-cell-dayofweek">(${dayOfWeek})</small>
           </span>
-          <span style="font-size:0.675rem; font-weight:700; color:${dayAssignments.length > 0 ? 'var(--color-text)' : 'var(--color-text-muted)'};">
-            ${dayAssignments.length}名配置
+          <span style="font-size:0.65rem; font-weight:700; color:${dayAssignments.length > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'};">
+            配置 ${dayAssignments.length}名
           </span>
         </div>
 
@@ -118,31 +129,35 @@ function renderManagerMonthView(state) {
           ${dayAssignments.slice(0, 2).map(a => {
             const member = state.members.find(m => m.id === a.member_id);
             return `
-              <div style="display:flex; align-items:center; gap:4px; font-size:0.65rem; font-weight:600; background:var(--color-surface-subtle); padding:1px 4px; border-radius:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <div style="display:flex; align-items:center; gap:4px; font-size:0.625rem; font-weight:600; background:var(--color-surface-subtle); padding:1px 3px; border-radius:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 <span class="timeline-staff-dot" style="background:${member ? member.color : '#000'};"></span>
                 <span>${member ? member.name.split(' ')[0] : 'スタッフ'}</span>
                 <span style="color:var(--color-text-muted); font-weight:500;">${a.start_time.split(':')[0]}-${a.end_time.split(':')[0]}</span>
               </div>
             `;
           }).join('')}
-          ${dayAssignments.length > 2 ? `<div style="font-size:0.625rem; font-weight:600; color:var(--color-text-muted);">+他${dayAssignments.length - 2}名</div>` : ''}
+          ${dayAssignments.length > 2 ? `<div style="font-size:0.6rem; font-weight:600; color:var(--color-text-muted);">+他${dayAssignments.length - 2}名</div>` : ''}
         </div>
       </div>
     `;
 
-    // Mobile (iPhone) Date List Item
+    // Mobile (iPhone) Operational Date List Item
     mobileDateListHTML += `
-      <div class="settings-row ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}" style="cursor:pointer;">
-        <div style="display:flex; align-items:center; gap:var(--space-2);">
-          <strong style="font-size:0.85rem;">${year}年${monthIndex + 1}月${day}日 (${dayOfWeek})</strong>
-          <span style="font-size:0.75rem; color:var(--color-text-muted);">${dayAssignments.length}名配置</span>
+      <div class="settings-row ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}" style="cursor:pointer; padding:10px 12px;">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <div style="display:flex; align-items:center; gap:var(--space-2);">
+            <strong style="font-size:0.875rem;">${year}年${monthIndex + 1}月${day}日（${dayOfWeek}）</strong>
+            <span style="font-size:0.75rem; color:var(--color-text-muted);">配置 ${dayAssignments.length}名</span>
+          </div>
+          ${dayShortage.hasShortage ? `
+            <div style="font-size:0.725rem; font-weight:700; color:var(--color-danger);">
+              ${dayShortage.shortageItems.map(item => `${item.timeStart}–${item.timeEnd} ${item.deficit}名不足`).join(' / ')}
+            </div>
+          ` : `
+            <div style="font-size:0.725rem; font-weight:600; color:var(--color-success);">適正配置</div>
+          `}
         </div>
-        <div>
-          ${dayShortage.hasShortage
-            ? `<span style="font-weight:700; font-size:0.75rem; color:var(--color-danger);">⚠️ ${dayShortage.summaryText}</span>`
-            : `<span style="font-weight:700; font-size:0.75rem; color:var(--color-success);">適正</span>`
-          }
-        </div>
+        <span style="font-size:0.75rem; color:var(--color-text-muted);">＞</span>
       </div>
     `;
   }
@@ -150,8 +165,8 @@ function renderManagerMonthView(state) {
   return `
     <div class="calendar-surface">
       <div class="calendar-surface-header">
-        <span style="font-weight:800; font-size:0.95rem;">${year}年${monthIndex + 1}月 全体シフト & 不足検知</span>
-        <span style="font-size:0.75rem; color:var(--color-text-muted);">セルをタップすると1日タイムライン編集へ移動します</span>
+        <span style="font-weight:800; font-size:0.9rem;">${year}年${monthIndex + 1}月 月間シフト</span>
+        <span style="font-size:0.725rem; color:var(--color-text-muted);">日付を選ぶと1日タイムラインへ移動します</span>
       </div>
 
       <div class="calendar-grid-table">
@@ -164,11 +179,15 @@ function renderManagerMonthView(state) {
         <div class="calendar-weekday-cell weekend">土</div>
         ${monthGridHTML}
       </div>
+
+      <div class="mobile-op-list" style="display:none;">
+        ${mobileDateListHTML}
+      </div>
     </div>
   `;
 }
 
-// Manager Day Mode Working Surface (Suketto Table/Grid Layout)
+// Manager Day Mode Working Surface
 function renderManagerDayTimelineView(state) {
   const selectedDate = state.selectedDate;
   const storeOpenMinutes = parseTimeMinutes(state.store ? state.store.default_open_time : '09:00');
@@ -190,7 +209,6 @@ function renderManagerDayTimelineView(state) {
     const slotStartM = h * 60;
     const slotEndM = slotStartM + 60;
 
-    // Check staffing rule required count for this hour
     const matchingRule = (state.staffingRules || []).find(r => {
       const rStart = parseTimeMinutes(r.time_start);
       const rEnd = parseTimeMinutes(r.time_end);
@@ -199,7 +217,6 @@ function renderManagerDayTimelineView(state) {
 
     const reqCount = matchingRule.required_count;
 
-    // Count assigned staff
     const asgsOnDate = state.assignments.filter(a => a.date === selectedDate);
     let assignedCount = 0;
     for (const asg of asgsOnDate) {
@@ -212,7 +229,7 @@ function renderManagerDayTimelineView(state) {
 
     const isShort = assignedCount < reqCount;
     return `
-      <div class="coverage-cell ${isShort ? 'shortage' : ''}" title="${h}:00時点 必要:${reqCount}名 / 配置:${assignedCount}名">
+      <div class="coverage-cell ${isShort ? 'shortage' : ''}" title="${h}:00 必要:${reqCount}名 / 配置:${assignedCount}名">
         ${assignedCount}/${reqCount}
       </div>
     `;
@@ -223,7 +240,6 @@ function renderManagerDayTimelineView(state) {
     const avail = state.availability.find(a => a.member_id === member.id && a.date === selectedDate);
     const asgs = state.assignments.filter(a => a.member_id === member.id && a.date === selectedDate);
 
-    // Calculate monthly hours for this staff
     let totalMonthlyHours = 0;
     state.assignments.filter(a => a.member_id === member.id).forEach(a => {
       const dur = (parseTimeMinutes(a.end_time) - parseTimeMinutes(a.start_time) - (a.break_minutes || 0)) / 60;
@@ -260,21 +276,22 @@ function renderManagerDayTimelineView(state) {
 
       let breakHTML = '';
       if (asg.break_minutes > 0) {
-        const breakPct = (asg.break_minutes / (endM - startM)) * 100;
+        const breakPct = (asg.break_minutes / Math.max(1, endM - startM)) * 100;
         breakHTML = `<div class="break-strip" style="left:30%; width:${breakPct}%;" title="休憩 ${asg.break_minutes}分"></div>`;
       }
 
+      const isSelected = selectedShiftId === asg.id;
+
       return `
-        <div class="shift-block-layer" data-asg-id="${asg.id}" style="left:${leftPct}%; width:${widthPct}%; background:${member.color};">
+        <div class="shift-block-layer ${isSelected ? 'selected-shift' : ''}" data-asg-id="${asg.id}" style="left:${leftPct}%; width:${widthPct}%; background:${member.color};">
           <div class="shift-resize-handle left" data-resize="left" data-asg-id="${asg.id}"></div>
-          <span style="position:relative; z-index:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${asg.start_time}–${asg.end_time}</span>
+          <span style="position:relative; z-index:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; pointer-events:none;">${asg.start_time}–${asg.end_time}</span>
           ${breakHTML}
           <div class="shift-resize-handle right" data-resize="right" data-asg-id="${asg.id}"></div>
         </div>
       `;
     }).join('');
 
-    // Background vertical grid lines
     const gridColsHTML = hourCols.map(() => `<div class="grid-line-col"></div>`).join('');
 
     return `
@@ -293,48 +310,95 @@ function renderManagerDayTimelineView(state) {
     `;
   }).join('');
 
+  // Selected shift inspector HTML
+  let inspectorHTML = '';
+  if (selectedShiftId) {
+    const asg = state.assignments.find(a => a.id === selectedShiftId);
+    if (asg) {
+      const member = state.members.find(m => m.id === asg.member_id);
+      const avail = state.availability.find(a => a.member_id === asg.member_id && a.date === asg.date);
+      let availDesc = '未定';
+      if (avail) {
+        if (avail.state === 'full') availDesc = '終日';
+        else if (avail.state === 'range') availDesc = `時間指定 (${avail.start_time || ''}–${avail.end_time || ''})`;
+        else if (avail.state === 'unavailable') availDesc = '出勤不可';
+      }
+
+      let totalM = 0;
+      state.assignments.filter(a => a.member_id === asg.member_id).forEach(a => {
+        totalM += (parseTimeMinutes(a.end_time) - parseTimeMinutes(a.start_time) - (a.break_minutes || 0)) / 60;
+      });
+
+      inspectorHTML = `
+        <div class="context-inspector">
+          <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); padding-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="timeline-staff-dot" style="background:${member ? member.color : '#000'};"></span>
+              <strong style="font-size:0.875rem;">${member ? member.name : 'スタッフ'}</strong>
+              <span style="font-size:0.75rem; color:var(--color-text-muted);">${asg.date}</span>
+            </div>
+            <button id="close-inspector-btn" class="btn btn-secondary btn-sm">✕</button>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2); font-size:0.8rem;">
+            <div>勤務: <strong>${asg.start_time} → ${asg.end_time}</strong> (休憩 ${asg.break_minutes || 0}分)</div>
+            <div>希望: <strong>${availDesc}</strong></div>
+            <div>月間: <strong>${totalM.toFixed(1)} / ${(member && member.max_monthly_hours) ? member.max_monthly_hours : 100}h</strong></div>
+
+            <div style="display:flex; gap:var(--space-2);">
+              <button id="edit-inspector-shift-btn" class="btn btn-secondary btn-sm">編集</button>
+              <button id="delete-inspector-shift-btn" class="btn btn-secondary btn-sm" style="color:var(--color-danger); border-color:var(--color-danger-border);">削除</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  const [yStr, mStr, dStr] = selectedDate.split('-');
+  const selectedDateFormatted = `${parseInt(mStr, 10)}月${parseInt(dStr, 10)}日のシフト`;
+
   return `
     <div class="day-workspace">
       <div class="day-workspace-toolbar">
         <div>
-          <span style="font-weight:800; font-size:0.95rem;">${selectedDate} タイムライン配置 & 調整</span>
-          <span style="font-size:0.75rem; color:var(--color-text-muted); margin-left:8px;">トラック上をタップしてシフト新規追加</span>
+          <span style="font-weight:800; font-size:0.9rem;">${selectedDateFormatted}</span>
+          <span style="font-size:0.725rem; color:var(--color-text-muted); margin-left:8px;">空いている時間をドラッグして追加</span>
         </div>
 
         ${dayShortage.hasShortage ? `
-          <div style="font-size:0.75rem; font-weight:700; color:var(--color-danger); background:var(--color-danger-bg); border:1px solid var(--color-danger-border); padding:2px 8px; border-radius:var(--radius-xs);">
-            ⚠️ 本日の人員不足: ${dayShortage.summaryText}
+          <div style="font-size:0.725rem; font-weight:700; color:var(--color-danger); background:var(--color-danger-bg); border:1px solid var(--color-danger-border); padding:2px 8px; border-radius:var(--radius-xs);">
+            人員不足: ${dayShortage.summaryText}
           </div>
         ` : `
-          <div style="font-size:0.75rem; font-weight:700; color:var(--color-success); background:var(--color-success-bg); border:1px solid var(--color-success-border); padding:2px 8px; border-radius:var(--radius-xs);">
-            ✅ 本日の必要人員充足
+          <div style="font-size:0.725rem; font-weight:700; color:var(--color-success); background:var(--color-success-bg); border:1px solid var(--color-success-border); padding:2px 8px; border-radius:var(--radius-xs);">
+            適正配置
           </div>
         `}
       </div>
 
       <div class="timeline-grid-container">
         <div class="timeline-grid-table">
-          <!-- Staffing Coverage Strip Row -->
           <div class="coverage-strip">
             <div class="coverage-label">配置 / 必要人数</div>
             <div class="coverage-grid">${coverageCellsHTML}</div>
           </div>
 
-          <!-- Hours Header Row -->
           <div class="timeline-header-row">
             <div class="timeline-corner-cell">スタッフ名</div>
             <div class="timeline-hours-bar">${hourHeadersHTML}</div>
           </div>
 
-          <!-- Staff Rows -->
           ${staffRowsHTML}
         </div>
       </div>
+
+      ${inspectorHTML}
     </div>
   `;
 }
 
-// Event Listeners setup for Manager Workspace
+// Event Listeners setup for Manager Workspace with Direct Manipulation
 export function setupTimelineEvents(stateManager) {
   const monthBtn = document.getElementById('mgr-mode-month-btn');
   const timelineBtn = document.getElementById('mgr-mode-timeline-btn');
@@ -354,27 +418,190 @@ export function setupTimelineEvents(stateManager) {
     });
   });
 
-  // Tapping empty timeline track creates shift
+  // Time parameters
+  const state = stateManager.state;
+  const storeOpenMinutes = parseTimeMinutes(state.store ? state.store.default_open_time : '09:00');
+  const storeCloseMinutes = parseTimeMinutes(state.store ? state.store.default_close_time : '21:30');
+  const totalTimelineMinutes = storeCloseMinutes - storeOpenMinutes;
+
+  // Track click and drag manipulation
   const tracks = document.querySelectorAll('.timeline-track-cell');
   tracks.forEach(track => {
-    track.addEventListener('click', (e) => {
-      if (e.target.closest('.shift-block-layer')) {
-        return;
-      }
+    let isDraggingTrack = false;
+    let trackStartX = 0;
+    let startMins = 0;
+
+    track.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.shift-block-layer')) return;
+
+      const trackRect = track.getBoundingClientRect();
+      const clickX = e.clientX - trackRect.left;
+      const pct = Math.max(0, Math.min(1, clickX / trackRect.width));
+      const rawMins = storeOpenMinutes + pct * totalTimelineMinutes;
+      startMins = Math.round(rawMins / 15) * 15;
+      trackStartX = e.clientX;
+      isDraggingTrack = true;
+    });
+
+    track.addEventListener('pointerup', (e) => {
+      if (!isDraggingTrack) return;
+      isDraggingTrack = false;
+
+      const trackRect = track.getBoundingClientRect();
+      const clickX = e.clientX - trackRect.left;
+      const pct = Math.max(0, Math.min(1, clickX / trackRect.width));
+      const rawMins = storeOpenMinutes + pct * totalTimelineMinutes;
+      const endMins = Math.round(rawMins / 15) * 15;
+
       const memberId = track.getAttribute('data-track-member');
-      openShiftCreationModal(stateManager, memberId, stateManager.state.selectedDate);
+      selectedShiftId = null;
+
+      if (Math.abs(e.clientX - trackStartX) > 20 && Math.abs(endMins - startMins) >= 30) {
+        const startT = minutesToTimeString(Math.min(startMins, endMins));
+        const endT = minutesToTimeString(Math.max(startMins, endMins));
+
+        stateManager.saveAssignment({
+          id: `asg-${generateUUID()}`,
+          period_id: state.period ? state.period.id : 'period-2026-10',
+          date: state.selectedDate,
+          member_id: memberId,
+          start_time: startT,
+          end_time: endT,
+          break_minutes: 60,
+          preset_id: null,
+          is_locked: false,
+          source: 'manual'
+        });
+        showToast(`シフト作成: ${startT}–${endT}`);
+      } else {
+        openShiftCreationModal(stateManager, memberId, stateManager.state.selectedDate);
+      }
     });
   });
 
-  // Tapping an existing shift block opens shift edit sheet
+  // Shift block direct drag move / resize handle manipulation
   const shiftBlocks = document.querySelectorAll('.shift-block-layer');
   shiftBlocks.forEach(block => {
-    block.addEventListener('click', (e) => {
+    const asgId = block.getAttribute('data-asg-id');
+    const asg = state.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    let isInteracting = false;
+    let mode = 'move'; // 'move', 'resize-left', 'resize-right'
+    let startX = 0;
+    let origStartM = parseTimeMinutes(asg.start_time);
+    let origEndM = parseTimeMinutes(asg.end_time);
+    let origDuration = origEndM - origStartM;
+
+    block.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
-      const asgId = block.getAttribute('data-asg-id');
-      openShiftEditModal(stateManager, asgId);
+      block.setPointerCapture(e.pointerId);
+      isInteracting = true;
+      startX = e.clientX;
+
+      origStartM = parseTimeMinutes(asg.start_time);
+      origEndM = parseTimeMinutes(asg.end_time);
+      origDuration = origEndM - origStartM;
+
+      const resizeTarget = e.target.closest('.shift-resize-handle');
+      if (resizeTarget) {
+        mode = resizeTarget.getAttribute('data-resize') === 'left' ? 'resize-left' : 'resize-right';
+      } else {
+        mode = 'move';
+        selectedShiftId = asgId;
+        stateManager.notify();
+      }
+    });
+
+    block.addEventListener('pointermove', (e) => {
+      if (!isInteracting) return;
+
+      const trackRect = block.parentElement.getBoundingClientRect();
+      const deltaX = e.clientX - startX;
+      const deltaMins = Math.round(((deltaX / trackRect.width) * totalTimelineMinutes) / 15) * 15;
+
+      if (mode === 'move') {
+        let newStartM = Math.max(storeOpenMinutes, Math.min(storeCloseMinutes - origDuration, origStartM + deltaMins));
+        let newEndM = newStartM + origDuration;
+
+        const leftPct = ((newStartM - storeOpenMinutes) / totalTimelineMinutes) * 100;
+        block.style.left = `${leftPct.toFixed(2)}%`;
+        const timeSpan = block.querySelector('span');
+        if (timeSpan) timeSpan.textContent = `${minutesToTimeString(newStartM)}–${minutesToTimeString(newEndM)}`;
+      } else if (mode === 'resize-left') {
+        let newStartM = Math.max(storeOpenMinutes, Math.min(origEndM - 30, origStartM + deltaMins));
+        const leftPct = ((newStartM - storeOpenMinutes) / totalTimelineMinutes) * 100;
+        const widthPct = (((origEndM - newStartM) / totalTimelineMinutes) * 100);
+        block.style.left = `${leftPct.toFixed(2)}%`;
+        block.style.width = `${widthPct.toFixed(2)}%`;
+        const timeSpan = block.querySelector('span');
+        if (timeSpan) timeSpan.textContent = `${minutesToTimeString(newStartM)}–${minutesToTimeString(origEndM)}`;
+      } else if (mode === 'resize-right') {
+        let newEndM = Math.min(storeCloseMinutes, Math.max(origStartM + 30, origEndM + deltaMins));
+        const widthPct = (((newEndM - origStartM) / totalTimelineMinutes) * 100);
+        block.style.width = `${widthPct.toFixed(2)}%`;
+        const timeSpan = block.querySelector('span');
+        if (timeSpan) timeSpan.textContent = `${minutesToTimeString(origStartM)}–${minutesToTimeString(newEndM)}`;
+      }
+    });
+
+    block.addEventListener('pointerup', async (e) => {
+      if (!isInteracting) return;
+      isInteracting = false;
+      try { block.releasePointerCapture(e.pointerId); } catch (_) {}
+
+      const trackRect = block.parentElement.getBoundingClientRect();
+      const deltaX = e.clientX - startX;
+      const deltaMins = Math.round(((deltaX / trackRect.width) * totalTimelineMinutes) / 15) * 15;
+
+      if (deltaMins === 0) return;
+
+      let newStartM = origStartM;
+      let newEndM = origEndM;
+
+      if (mode === 'move') {
+        newStartM = Math.max(storeOpenMinutes, Math.min(storeCloseMinutes - origDuration, origStartM + deltaMins));
+        newEndM = newStartM + origDuration;
+      } else if (mode === 'resize-left') {
+        newStartM = Math.max(storeOpenMinutes, Math.min(origEndM - 30, origStartM + deltaMins));
+      } else if (mode === 'resize-right') {
+        newEndM = Math.min(storeCloseMinutes, Math.max(origStartM + 30, origEndM + deltaMins));
+      }
+
+      await stateManager.saveAssignment({
+        ...asg,
+        start_time: minutesToTimeString(newStartM),
+        end_time: minutesToTimeString(newEndM)
+      });
+
+      showToast(`シフト変更: ${minutesToTimeString(newStartM)}–${minutesToTimeString(newEndM)}`);
     });
   });
+
+  const closeInspectorBtn = document.getElementById('close-inspector-btn');
+  if (closeInspectorBtn) {
+    closeInspectorBtn.addEventListener('click', () => {
+      selectedShiftId = null;
+      stateManager.notify();
+    });
+  }
+
+  const editInspectorBtn = document.getElementById('edit-inspector-shift-btn');
+  if (editInspectorBtn && selectedShiftId) {
+    editInspectorBtn.addEventListener('click', () => {
+      openShiftEditModal(stateManager, selectedShiftId);
+    });
+  }
+
+  const deleteInspectorBtn = document.getElementById('delete-inspector-shift-btn');
+  if (deleteInspectorBtn && selectedShiftId) {
+    deleteInspectorBtn.addEventListener('click', async () => {
+      const asgIdToDelete = selectedShiftId;
+      selectedShiftId = null;
+      await stateManager.deleteAssignment(asgIdToDelete);
+      showToast('シフトを削除しました');
+    });
+  }
 
   // AI Shift Generator button
   const aiBtn = document.getElementById('ai-generate-btn');
@@ -400,10 +627,10 @@ function openShiftEditModal(stateManager, asgId) {
   const member = stateManager.state.members.find(m => m.id === asg.member_id);
   const avail = stateManager.state.availability.find(a => a.member_id === asg.member_id && a.date === asg.date);
 
-  let availDesc = '未入力';
+  let availDesc = '未定';
   if (avail) {
-    if (avail.state === 'full') availDesc = '終日OK';
-    else if (avail.state === 'range') availDesc = `時間指定 (${avail.start_time || ''}-${avail.end_time || ''})`;
+    if (avail.state === 'full') availDesc = '終日';
+    else if (avail.state === 'range') availDesc = `時間指定 (${avail.start_time || ''}–${avail.end_time || ''})`;
     else if (avail.state === 'unavailable') availDesc = '出勤不可';
   }
 
@@ -414,7 +641,7 @@ function openShiftEditModal(stateManager, asgId) {
         ${member ? member.name : 'スタッフ'} のシフト調整 (${asg.date})
       </div>
 
-      <div style="font-size:0.75rem; color:var(--color-text-secondary); background:var(--color-surface-subtle); padding:6px 10px; border-radius:var(--radius-sm);">
+      <div style="font-size:0.75rem; color:var(--color-text-secondary); background:var(--color-surface-subtle); padding:6px 10px; border-radius:var(--radius-xs);">
         本人希望: <strong>${availDesc}</strong>
       </div>
 
@@ -461,12 +688,14 @@ function openShiftEditModal(stateManager, asgId) {
         });
 
         closeBottomSheet();
+        selectedShiftId = null;
         showToast('シフトを更新しました');
       });
 
       body.querySelector('#delete-shift-btn').addEventListener('click', async () => {
         await stateManager.deleteAssignment(asgId);
         closeBottomSheet();
+        selectedShiftId = null;
         showToast('シフトを削除しました');
       });
     }
