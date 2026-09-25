@@ -85,7 +85,7 @@ export function calculateDayShortages(dateKey, state) {
   if (shortageItems.length === 1) {
     summaryText = `${shortageItems[0].timeStart}–${shortageItems[0].timeEnd} ${shortageItems[0].deficit}名不足`;
   } else if (shortageItems.length > 1) {
-    summaryText = `${shortageItems[0].timeStart}~等 ${totalDeficit}名不足`;
+    summaryText = `${shortageItems[0].timeStart}〜 ${totalDeficit}名不足`;
   }
 
   return {
@@ -111,7 +111,8 @@ export function renderMiniShortageBar(shortageItems, storeOpenTime = '09:00', st
     const endM = parseTimeMinutes(item.timeEnd);
     const leftPct = Math.max(0, ((startM - openM) / totalM) * 100);
     const widthPct = Math.min(100 - leftPct, ((endM - startM) / totalM) * 100);
-    return `<div class="shortage-mini-segment" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%;"></div>`;
+    const opacity = item.isCritical ? '1' : '0.7';
+    return `<div class="shortage-mini-segment" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%; opacity:${opacity};"></div>`;
   }).join('');
 
   return `<div class="shortage-mini-bar" title="不足時間帯">${segments}</div>`;

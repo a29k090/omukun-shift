@@ -1,8 +1,8 @@
 /* ============================================================
-   omukun Shift - Design System & Stylesheet (SUKETTO Workstation)
+   omukun Shift - Design System & Stylesheet (Suketto Workstation)
    ============================================================ */
 
-/* --- Typography: Higure Gothic --- */
+/* --- Typography: Higure Gothic & Tabular Font Stack --- */
 @font-face {
   font-family: 'HigureGothic';
   src: url('./assets/fonts/HigureGothic-Light.ttf') format('truetype');
@@ -45,14 +45,13 @@
 
 /* --- Design Tokens --- */
 :root {
-  --font-family-brand: 'HigureGothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
-  --font-family-body: 'HigureGothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+  --font-family-body: 'HigureGothic', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
 
-  /* Monochrome Base Palette */
+  /* Suketto Monochrome Base Palette */
   --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-subtle: #f8f8f9;
-  --color-surface-hover: #f1f1f2;
+  --color-surface-subtle: #f9f9fa;
+  --color-surface-hover: #f1f1f3;
 
   --color-text: #09090b;
   --color-text-secondary: #3f3f46;
@@ -64,9 +63,8 @@
 
   --color-accent-black: #18181b;
   --color-accent-hover: #27272a;
-  --color-brand-orange: #ff6b35;
 
-  /* Functional Status Colors */
+  /* Semantic Shortage & Warning Colors (Strictly separate from staff colors) */
   --color-danger: #dc2626;
   --color-danger-bg: #fef2f2;
   --color-danger-border: #fecaca;
@@ -79,7 +77,7 @@
   --color-success: #059669;
   --color-success-bg: #ecfdf5;
 
-  /* Spacing Grid (tight, dense tool grid) */
+  /* Spacing Grid */
   --space-1: 4px;
   --space-2: 6px;
   --space-3: 10px;
@@ -87,14 +85,13 @@
   --space-5: 18px;
   --space-6: 24px;
 
-  /* Sharp Tool Radii - Zero Pills */
+  /* Precise Radii - Crisp Rectangular Controls */
   --radius-none: 0px;
   --radius-xs: 2px;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 4px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
 
-  /* Fast Resresponsive Workstation Transitions */
+  /* Transitions */
   --transition-fast: 80ms ease;
   --transition-normal: 150ms ease;
 }
@@ -126,7 +123,7 @@ html, body {
   flex-direction: column;
 }
 
-/* --- Header Bar --- */
+/* --- App Top Navigation Bar --- */
 .app-header {
   position: sticky;
   top: 0;
@@ -135,7 +132,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-4);
-  height: 42px;
+  height: 44px;
   background: #ffffff;
   border-bottom: 1px solid var(--color-border);
 }
@@ -152,8 +149,8 @@ html, body {
 }
 
 .brand-title {
-  font-family: var(--font-family-brand);
-  font-weight: 900;
+  font-family: var(--font-family-body);
+  font-weight: 800;
   font-size: 0.95rem;
   letter-spacing: -0.02em;
   color: var(--color-text);
@@ -183,7 +180,6 @@ html, body {
   border-color: var(--color-border-strong);
 }
 
-/* Sharp Rectangular Role Switcher Toggle */
 .role-switcher {
   display: inline-flex;
   border: 1px solid var(--color-border-strong);
@@ -220,7 +216,7 @@ html, body {
   font-weight: 600;
 }
 
-/* --- Main Workspace Layout --- */
+/* --- Main Layout Frame --- */
 .main-content {
   flex: 1;
   padding: var(--space-3) var(--space-4);
@@ -232,7 +228,7 @@ html, body {
   gap: var(--space-3);
 }
 
-/* --- Continuous Workstation Header Strip --- */
+/* --- Workstation Toolbar Strip --- */
 .workspace-header-strip {
   display: flex;
   flex-wrap: wrap;
@@ -263,7 +259,6 @@ html, body {
 .header-strip-label {
   font-size: 0.675rem;
   font-weight: 700;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
@@ -287,7 +282,7 @@ html, body {
   background: var(--color-border);
 }
 
-/* Sharp Tool Controls */
+/* Segmented Control Toggle Buttons */
 .segmented-control {
   display: inline-flex;
   border: 1px solid var(--color-border-strong);
@@ -316,13 +311,13 @@ html, body {
   color: #ffffff;
 }
 
-/* Sharp Action Buttons */
+/* Button System */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  padding: 3px 10px;
+  padding: 4px 12px;
   font-size: 0.775rem;
   font-weight: 700;
   border-radius: var(--radius-xs);
@@ -336,6 +331,7 @@ html, body {
 .btn-primary {
   background: var(--color-accent-black);
   color: #ffffff;
+  border-color: var(--color-accent-black);
 }
 
 .btn-primary:hover {
@@ -353,19 +349,9 @@ html, body {
   border-color: var(--color-border-strong);
 }
 
-.btn-accent {
-  background: var(--color-brand-orange);
-  color: #ffffff;
-  border-color: var(--color-brand-orange);
-}
-
-.btn-accent:hover {
-  opacity: 0.92;
-}
-
 .btn-sm {
-  padding: 2px 6px;
-  font-size: 0.7rem;
+  padding: 2px 8px;
+  font-size: 0.725rem;
 }
 
 .btn-active {
@@ -374,7 +360,7 @@ html, body {
   border-color: var(--color-accent-black);
 }
 
-/* --- Table Grid Surface --- */
+/* Grid & Calendar Base Surface */
 .calendar-surface {
   display: flex;
   flex-direction: column;
@@ -404,8 +390,7 @@ html, body {
   font-size: 0.7rem;
   font-weight: 800;
   color: var(--color-text-muted);
-  padding: 4px 0;
-  border-bottom: 1px solid var(--color-border);
+  padding: 5px 0;
 }
 
 .calendar-weekday-cell.weekend {
@@ -413,9 +398,9 @@ html, body {
 }
 
 .calendar-cell {
-  min-height: 100px;
+  min-height: 96px;
   background: #ffffff;
-  padding: 4px var(--space-1);
+  padding: 6px var(--space-2);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -425,7 +410,7 @@ html, body {
 }
 
 .calendar-cell:hover {
-  background: #f8f8f9;
+  background: var(--color-surface-hover);
 }
 
 .calendar-cell.selected {
@@ -446,7 +431,7 @@ html, body {
 
 .calendar-cell-num {
   font-weight: 800;
-  font-size: 0.825rem;
+  font-size: 0.85rem;
   color: var(--color-text);
 }
 
@@ -461,29 +446,27 @@ html, body {
   margin-left: 2px;
 }
 
-/* Sharp Operational Tags (Non-bubbly) */
-.avail-tag {
-  font-size: 0.675rem;
+/* Concise Operational Text Availability Display */
+.avail-text {
+  font-size: 0.725rem;
   font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 0px;
   text-align: center;
-  border: 1px solid transparent;
+  padding: 2px 0;
 }
 
-.avail-tag-unset { background: #fafafa; color: var(--color-text-muted); border-color: var(--color-border); }
-.avail-tag-full { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-.avail-tag-until { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-.avail-tag-from { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
-.avail-tag-range { background: #fffbeb; color: #b45309; border-color: #fde68a; }
-.avail-tag-unavailable { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.avail-text-full { color: #047857; font-weight: 800; }
+.avail-text-range { color: #b45309; font-weight: 700; }
+.avail-text-until { color: #1d4ed8; font-weight: 700; }
+.avail-text-from { color: #6d28d9; font-weight: 700; }
+.avail-text-unavailable { color: #b91c1c; font-weight: 700; }
+.avail-text-undecided { color: var(--color-text-muted); font-weight: 500; }
 
 /* Shortage Indicators in Manager Month Cell */
 .cell-shortage-box {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin-top: 2px;
+  gap: 2px;
+  margin: 4px 0;
 }
 
 .shortage-slot-strip {
@@ -491,15 +474,15 @@ html, body {
   align-items: center;
   justify-content: space-between;
   font-size: 0.625rem;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--color-danger-text);
   background: var(--color-danger-bg);
-  border-left: 2px solid var(--color-danger);
-  padding: 0 3px;
+  border-left: 3px solid var(--color-danger);
+  padding: 1px 4px;
 }
 
 .shortage-mini-bar {
-  height: 3px;
+  height: 4px;
   background: var(--color-border-subtle);
   position: relative;
   margin: 2px 0;
@@ -512,7 +495,7 @@ html, body {
   background: var(--color-danger);
 }
 
-/* --- Day Timeline Table Surface --- */
+/* --- Day Timeline Workstation Surface --- */
 .day-workspace {
   display: flex;
   flex-direction: column;
@@ -530,10 +513,10 @@ html, body {
   background: var(--color-surface-subtle);
 }
 
-/* Coverage Strip Row */
+/* Aligned Coverage Strip Row */
 .coverage-strip {
   display: flex;
-  height: 24px;
+  height: 26px;
   align-items: center;
   background: #fafafa;
   border-bottom: 1px solid var(--color-border);
@@ -541,7 +524,7 @@ html, body {
 }
 
 .coverage-label {
-  width: 130px;
+  width: 140px;
   flex-shrink: 0;
   padding-left: var(--space-2);
   font-weight: 800;
@@ -569,15 +552,16 @@ html, body {
 .coverage-cell.shortage {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
+  border-right-color: var(--color-danger-border);
 }
 
-/* Main Timeline Grid Surface */
+/* Timeline Container */
 .timeline-grid-container {
   overflow-x: auto;
 }
 
 .timeline-grid-table {
-  min-width: 840px;
+  min-width: 860px;
   display: flex;
   flex-direction: column;
 }
@@ -591,7 +575,7 @@ html, body {
 }
 
 .timeline-corner-cell {
-  width: 130px;
+  width: 140px;
   flex-shrink: 0;
   padding-left: var(--space-2);
   font-size: 0.675rem;
@@ -618,16 +602,16 @@ html, body {
   align-items: center;
 }
 
-/* Staff Rows */
+/* Staff Timeline Rows */
 .timeline-staff-row {
   display: flex;
-  height: 42px;
+  height: 44px;
   border-bottom: 1px solid var(--color-border-subtle);
   position: relative;
 }
 
 .timeline-staff-cell {
-  width: 130px;
+  width: 140px;
   flex-shrink: 0;
   padding: 0 var(--space-2);
   display: flex;
@@ -643,8 +627,8 @@ html, body {
 }
 
 .timeline-staff-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -678,20 +662,21 @@ html, body {
   border-right: 1px solid #f4f4f5;
 }
 
-/* Shift and Availability Blocks */
+/* Translucent Availability vs Solid Shift Blocks */
 .avail-block-layer {
   position: absolute;
   height: 70%;
   top: 15%;
-  opacity: 0.25;
+  opacity: 0.2;
   pointer-events: none;
   border: 1px dashed currentColor;
+  background: currentColor;
 }
 
 .shift-block-layer {
   position: absolute;
-  height: 80%;
-  top: 10%;
+  height: 82%;
+  top: 9%;
   border-radius: 0px;
   display: flex;
   align-items: center;
@@ -700,15 +685,20 @@ html, body {
   font-size: 0.675rem;
   font-weight: 800;
   color: #ffffff;
-  cursor: pointer;
+  cursor: grab;
   user-select: none;
-  border: 1px solid rgba(0,0,0,0.3);
-  transition: filter var(--transition-fast);
+  border: 1px solid rgba(0,0,0,0.25);
   z-index: 5;
 }
 
+.shift-block-layer.selected-shift {
+  outline: 2px solid var(--color-accent-black);
+  outline-offset: 1px;
+  z-index: 8;
+}
+
 .shift-resize-handle {
-  width: 5px;
+  width: 6px;
   height: 100%;
   position: absolute;
   top: 0;
@@ -724,14 +714,25 @@ html, body {
   height: 100%;
   background: repeating-linear-gradient(
     45deg,
-    rgba(0,0,0,0.2),
-    rgba(0,0,0,0.2) 3px,
-    rgba(0,0,0,0.35) 3px,
-    rgba(0,0,0,0.35) 6px
+    rgba(0,0,0,0.18),
+    rgba(0,0,0,0.18) 3px,
+    rgba(0,0,0,0.32) 3px,
+    rgba(0,0,0,0.32) 6px
   );
 }
 
-/* --- Context Inspector Table --- */
+/* Contextual Shift Inspector Panel */
+.context-inspector {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-strong);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Grouped Row List Settings */
 .settings-group {
   background: #ffffff;
   border: 1px solid var(--color-border);
@@ -750,11 +751,11 @@ html, body {
   border-bottom: none;
 }
 
-/* --- Bottom Sheet Dialogs --- */
+/* Bottom Sheet Control */
 .bottom-sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -774,6 +775,8 @@ html, body {
   max-width: 500px;
   background: #ffffff;
   border-top: 2px solid var(--color-accent-black);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
@@ -789,13 +792,14 @@ html, body {
 }
 
 .sheet-handle {
-  width: 28px;
-  height: 3px;
+  width: 32px;
+  height: 4px;
   background: #e4e4e7;
+  border-radius: 2px;
   align-self: center;
 }
 
-/* --- Toast Overlay --- */
+/* Toast Notification Overlay */
 .toast-container {
   position: fixed;
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
@@ -811,7 +815,7 @@ html, body {
 .toast {
   background: var(--color-accent-black);
   color: #ffffff;
-  padding: 5px var(--space-3);
+  padding: 6px var(--space-3);
   border-radius: var(--radius-xs);
   font-size: 0.775rem;
   font-weight: 700;
@@ -824,18 +828,20 @@ html, body {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* Radio Option Select Table for Staff Day Input */
+/* Radio Selection Rows for Availability Sheet */
 .radio-select-group {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
 }
 
 .radio-select-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px var(--space-3);
+  padding: 8px var(--space-3);
   background: #ffffff;
   border-bottom: 1px solid var(--color-border-subtle);
   cursor: pointer;
@@ -856,19 +862,19 @@ html, body {
   font-weight: 700;
 }
 
+.radio-indicator {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+}
+
 .radio-select-row.selected .radio-indicator {
   border-color: #ffffff;
   background: #ffffff;
 }
 
-.radio-indicator {
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-}
-
-/* Multi-date Bar */
+/* Multi-select Floating Bar */
 .multiselect-bar {
   position: sticky;
   bottom: var(--space-3);
@@ -879,14 +885,14 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
 }
 
-/* Form Controls */
+/* Form Elements */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .form-label {
@@ -899,7 +905,7 @@ html, body {
   background: #ffffff;
   border: 1px solid var(--color-border);
   color: var(--color-text);
-  padding: 4px var(--space-2);
+  padding: 5px var(--space-2);
   border-radius: var(--radius-xs);
   font-size: 0.825rem;
   outline: none;
@@ -909,7 +915,7 @@ html, body {
   border-color: var(--color-accent-black);
 }
 
-/* Mobile Responsive Adjustments */
+/* Mobile Responsive Tweaks */
 @media (max-width: 640px) {
   .app-header {
     padding: 0 var(--space-3);
@@ -920,8 +926,8 @@ html, body {
   }
 
   .calendar-cell {
-    min-height: 70px;
-    padding: 2px;
+    min-height: 72px;
+    padding: 3px;
   }
 
   .cell-shortage-box {

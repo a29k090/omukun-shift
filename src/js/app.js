@@ -1,12 +1,13 @@
 // Main application entry point
 import '../styles.css';
 import { stateManager } from './state.js';
-import { setupHeaderEvents, showToast } from './ui.js';
+import { setupHeaderEvents } from './ui.js';
 import { renderStaffAvailabilityView, setupAvailabilityEvents } from './availability.js';
 import { renderManagerWorkspaceView, setupTimelineEvents } from './timeline.js';
 
 function renderAppHeader(state) {
   const saveLabel = state.saveStatus === 'saving' ? '保存中…' : '保存済み';
+  const isStaff = state.role === 'staff';
 
   return `
     <header class="app-header">
@@ -21,9 +22,11 @@ function renderAppHeader(state) {
           ${saveLabel}
         </span>
 
-        <button id="store-code-badge" class="store-code-badge" title="店舗コードをコピー">
-          <span>店舗:</span> <strong>${state.store ? state.store.store_code : 'OMK-7F2K9'}</strong>
-        </button>
+        ${!isStaff ? `
+          <button id="store-code-badge" class="store-code-badge" title="店舗コードをコピー">
+            <span>店舗:</span> <strong>${state.store ? state.store.store_code : 'OMK-7F2K9'}</strong>
+          </button>
+        ` : ''}
 
         <div class="role-switcher">
           <button id="role-admin-btn" class="role-btn ${state.role === 'admin' ? 'active' : ''}">管理者</button>
