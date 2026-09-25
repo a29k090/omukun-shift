@@ -141,21 +141,13 @@ function renderManagerMonthView(state) {
       </div>
     `).join('');
 
-    // Single consolidated shortage section per date
+    // Single simplified shortage summary line per date in Month View (e.g. "不足 11:00–20:00")
     let consolidatedShortageHTML = '';
     if (dayShortage.hasShortage) {
-      const titleText = dayShortage.isProvisional ? '現時点の不足' : '不足';
-      const shortageListHTML = dayShortage.shortageItems.map(item => `
-        <div class="shortage-row-item">
-          <span>${item.timeStart}–${item.timeEnd}</span>
-          <strong class="shortage-count-text">${item.deficit}名</strong>
-        </div>
-      `).join('');
-
+      const prefix = dayShortage.isProvisional ? '現時点の不足' : '不足';
       consolidatedShortageHTML = `
         <div class="consolidated-shortage-box">
-          <div class="shortage-header-title">${titleText}</div>
-          <div class="shortage-items-list">${shortageListHTML}</div>
+          <div class="shortage-header-title">${prefix} ${dayShortage.monthShortageRange}</div>
           ${dayShortage.unenteredCount > 0 ? `<div class="shortage-unentered-text">未入力 ${dayShortage.unenteredCount}人</div>` : ''}
         </div>
       `;

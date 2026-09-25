@@ -182,16 +182,35 @@ export function calculateDayShortages(dateKey, state) {
   const isCritical = shortageItems.some(item => item.isCritical) || totalDeficit >= 3;
 
   let summaryText = '';
-  if (shortageItems.length === 1) {
-    summaryText = `${shortageItems[0].timeStart}–${shortageItems[0].timeEnd} ${shortageItems[0].deficit}名`;
-  } else if (shortageItems.length > 1) {
-    summaryText = shortageItems.map(item => `${item.timeStart}–${item.timeEnd} -${item.deficit}名`).join(' / ');
+  let monthShortageRange = '';
+
+  if (shortageItems.length > 0) {
+    const earliestStart = shortageItems[0].timeStart;
+    let maxEndM = parseTimeMinutes(shortageItems[0].timeEnd);
+    let latestEndStr = shortageItems[0].timeEnd;
+
+    for (let i = 1; i < shortageItems.length; i++) {
+      const endM = parseTimeMinutes(shortageItems[i].timeEnd);
+      if (endM > maxEndM) {
+        maxEndM = endM;
+        latestEndStr = shortageItems[i].timeEnd;
+      }
+    }
+
+    monthShortageRange = `${earliestStart}–${latestEndStr}`;
+
+    if (shortageItems.length === 1) {
+      summaryText = `${shortageItems[0].timeStart}–${shortageItems[0].timeEnd} ${shortageItems[0].deficit}名`;
+    } else {
+      summaryText = shortageItems.map(item => `${item.timeStart}–${item.timeEnd} -${item.deficit}名`).join(' / ');
+    }
   }
 
   return {
     hasShortage: shortageItems.length > 0,
     totalDeficit,
     shortageItems,
+    monthShortageRange,
     isCritical,
     isProvisional,
     enteredCount,
