@@ -1,4 +1,4 @@
-// UI helper utilities for bottom sheets, toasts, dialogs
+// UI helper utilities for bottom sheets, toasts, dialogs, and header events
 import { copyToClipboard } from './utils.js';
 
 export function showToast(message, duration = 2500) {
@@ -37,14 +37,12 @@ export function createBottomSheet({ title, contentHTML, onOpen }) {
 
   const body = backdrop.querySelector('.sheet-body');
   body.innerHTML = `
-    <div style="display:flex; justify-between; align-items:center; margin-bottom: 16px;">
-      <h3 style="font-size: 1.1rem; font-weight:700;">${title}</h3>
-      <button class="btn btn-secondary btn-sm close-sheet-btn">✕</button>
-    </div>
+    ${title ? `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;"><h3 style="font-size: 1.1rem; font-weight:700;">${title}</h3><button class="btn btn-secondary btn-sm close-sheet-btn">✕</button></div>` : ''}
     ${contentHTML}
   `;
 
-  backdrop.querySelector('.close-sheet-btn').addEventListener('click', closeBottomSheet);
+  const closeBtns = body.querySelectorAll('.close-sheet-btn');
+  closeBtns.forEach(btn => btn.addEventListener('click', closeBottomSheet));
 
   requestAnimationFrame(() => backdrop.classList.add('open'));
   if (onOpen) onOpen(body);
@@ -58,11 +56,20 @@ export function closeBottomSheet() {
 }
 
 export function setupHeaderEvents(stateManager) {
+  const brandHomeLink = document.getElementById('brand-home-link');
+  if (brandHomeLink) {
+    brandHomeLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      stateManager.setCurrentView('workspace');
+    });
+  }
+
   const storeBadge = document.getElementById('store-code-badge');
   if (storeBadge) {
     storeBadge.addEventListener('click', () => {
-      copyToClipboard('OMK-7F2K9');
-      showToast('店舗コード OMK-7F2K9 をコピーしました');
+      const code = stateManager.state.store ? stateManager.state.store.store_code : 'OMK-7F2K9';
+      copyToClipboard(code);
+      showToast(`店舗コード ${code} をコピーしました`);
     });
   }
 
@@ -72,5 +79,27 @@ export function setupHeaderEvents(stateManager) {
   if (roleAdminBtn && roleStaffBtn) {
     roleAdminBtn.addEventListener('click', () => stateManager.setRole('admin'));
     roleStaffBtn.addEventListener('click', () => stateManager.setRole('staff'));
+  }
+
+  const navSettingsBtn = document.getElementById('nav-settings-btn');
+  if (navSettingsBtn) {
+    navSettingsBtn.addEventListener('click', () => {
+      stateManager.setCurrentView('settings');
+    });
+  }
+
+  const navLogoutBtn = document.getElementById('nav-logout-btn');
+  if (navLogoutBtn) {
+    navLogoutBtn.addEventListener('click', () => {
+      stateManager.setCurrentView('auth');
+      showToast('ログアウトしました');
+    });
+  }
+
+  const navLoginBtn = document.getElementById('nav-login-btn');
+  if (navLoginBtn) {
+    navLoginBtn.addEventListener('click', () => {
+      stateManager.setCurrentView('auth');
+    });
   }
 }

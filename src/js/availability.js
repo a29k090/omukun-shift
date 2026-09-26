@@ -1,8 +1,8 @@
-// Staff Availability Calendar Component and Clean Input Interactions
+// Staff Availability Calendar Component, Clean Inputs, and Completion Workflow
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
+import { getIconSVG } from './icons.js';
 
-// Local UI state for multi-date selection in Staff mode
 let multiSelectActive = false;
 const selectedDatesSet = new Set();
 
@@ -14,6 +14,21 @@ export function renderStaffAvailabilityView(state) {
   const month = monthIndex + 1;
   const daysInMonth = getDaysInMonth(year, monthIndex);
 
+  const period = state.period;
+  const isDraft = !period || period.status === 'draft';
+  const isClosed = period && (period.status === 'closed' || (period.deadline && new Date() > new Date(period.deadline)));
+
+  // If period is draft and user is staff, show friendly empty state
+  if (isDraft && state.role === 'staff') {
+    return `
+      <div style="text-align:center; padding:var(--space-9) var(--space-4); background:var(--color-surface-subtle); border:1px solid var(--color-border); border-radius:var(--radius-xs);">
+        ${getIconSVG('calendar', { size: 48, className: 'icon-muted' })}
+        <h2 style="font-size:1.2rem; font-weight:800; margin-top:var(--space-3);">現在募集している希望シフトはありません</h2>
+        <p style="font-size:0.85rem; color:var(--color-text-secondary); margin-top:var(--space-2);">管理者が募集を開始すると、こちらにカレンダーが表示されます。</p>
+      </div>
+    `;
+  }
+
   // Map member's availability entries
   const memberAvailMap = new Map();
   state.availability
@@ -21,7 +36,6 @@ export function renderStaffAvailabilityView(state) {
     .forEach(a => memberAvailMap.set(a.date, a));
 
   let enteredDays = 0;
-
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const entry = memberAvailMap.get(dateKey);
@@ -30,10 +44,14 @@ export function renderStaffAvailabilityView(state) {
     }
   }
 
+  // Submission tracking status for staff
+  const userSub = (state.submissions || []).find(s => s.member_id === currentMember.id);
+  const isSubmitted = userSub && userSub.status === 'submitted';
+
   // Formatting deadline
   let deadlineFormatted = '9月25日 23:59';
-  if (state.period && state.period.deadline) {
-    const dlStr = state.period.deadline.replace('T', ' ');
+  if (period && period.deadline) {
+    const dlStr = period.deadline.replace('T', ' ');
     const parts = dlStr.split(' ');
     const dateParts = parts[0].split('-');
     if (dateParts.length === 3) {
@@ -66,8 +84,8 @@ export function renderStaffAvailabilityView(state) {
     `;
   }
 
-  // Multi-select toolbar if active and dates selected
-  const multiselectBarHTML = (multiSelectActive && selectedDatesSet.size > 0) ? `
+  // Multi-select toolbar
+  const multiselectBarHTML = (multiSelectActive && selectedDatesSet.size > 0 && !isClosed) ? `
     <div class="multiselect-bar">
       <span style="font-weight:800; font-size:0.85rem;">${selectedDatesSet.size}日 選択中</span>
       <div style="display:flex; gap:var(--space-2);">
@@ -85,12 +103,25 @@ export function renderStaffAvailabilityView(state) {
       <div style="display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:var(--space-3); border-bottom:1px solid var(--color-border); padding-bottom:var(--space-3);">
         <div>
           <h1 style="font-size:1.5rem; font-weight:900; letter-spacing:-0.02em; color:var(--color-text);">${month}月の希望シフト</h1>
+          ${period && period.message ? `<p style="font-size:0.8rem; color:var(--color-text-secondary); margin-top:4px;">💬 ${period.message}</p>` : ''}
         </div>
 
-        <div style="display:flex; align-items:center; gap:var(--space-3); font-size:0.825rem; color:var(--color-text-secondary);">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3); font-size:0.825rem; color:var(--color-text-secondary);">
           <span>提出期限 <strong style="color:var(--color-text); font-weight:800;">${deadlineFormatted}</strong></span>
           <span style="color:var(--color-border);">|</span>
           <span>進捗 <strong style="color:var(--color-text); font-weight:800;">${enteredDays} / ${daysInMonth}日入力済み</strong></span>
+
+          ${isClosed ? `
+            <span class="btn btn-sm" style="background:var(--color-danger-bg); color:var(--color-danger); border:none; padding:2px 8px; font-weight:800;">提出期限終了</span>
+          ` : isSubmitted ? `
+            <button id="complete-submission-btn" class="btn btn-secondary btn-sm" style="background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success);">
+              ${getIconSVG('check', { size: 14 })} 入力完了済み (再編集可能)
+            </button>
+          ` : `
+            <button id="complete-submission-btn" class="btn btn-primary btn-sm">
+              ${getIconSVG('check', { size: 14 })} 入力を完了
+            </button>
+          `}
         </div>
       </div>
 
@@ -98,9 +129,11 @@ export function renderStaffAvailabilityView(state) {
       <div class="calendar-surface">
         <div class="calendar-surface-header">
           <span style="font-weight:800; font-size:0.9rem;">${year}年${month}月 カレンダー</span>
-          <button id="multi-select-toggle-btn" class="btn ${multiSelectActive ? 'btn-active' : 'btn-secondary'} btn-sm">
-            ${multiSelectActive ? '✕ 選択終了' : '☑ 複数選択'}
-          </button>
+          ${!isClosed ? `
+            <button id="multi-select-toggle-btn" class="btn ${multiSelectActive ? 'btn-active' : 'btn-secondary'} btn-sm">
+              ${multiSelectActive ? '✕ 選択終了' : '☑ 複数選択'}
+            </button>
+          ` : ''}
         </div>
 
         <div class="calendar-grid-table">
@@ -141,7 +174,6 @@ function getAvailTextHTML(entry) {
 }
 
 export function setupAvailabilityEvents(stateManager) {
-  // Toggle multi-select mode
   const toggleBtn = document.getElementById('multi-select-toggle-btn');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
@@ -151,7 +183,25 @@ export function setupAvailabilityEvents(stateManager) {
     });
   }
 
-  // Tapping calendar day cells
+  const completeSubBtn = document.getElementById('complete-submission-btn');
+  if (completeSubBtn) {
+    completeSubBtn.addEventListener('click', async () => {
+      const period = stateManager.state.period;
+      const currentMemberId = stateManager.state.currentMemberId;
+
+      await stateManager.saveSubmission({
+        id: `sub-${currentMemberId}`,
+        period_id: period ? period.id : 'period-2026-10',
+        member_id: currentMemberId,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        last_edited_at: new Date().toISOString()
+      });
+
+      showToast('希望シフトの入力を完了しました');
+    });
+  }
+
   const dayCells = document.querySelectorAll('.calendar-cell');
   dayCells.forEach(cell => {
     cell.addEventListener('click', () => {
@@ -171,7 +221,6 @@ export function setupAvailabilityEvents(stateManager) {
     });
   });
 
-  // Bulk apply button in multi-select toolbar
   const bulkBtns = document.querySelectorAll('.bulk-apply-btn');
   bulkBtns.forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -196,9 +245,12 @@ export function setupAvailabilityEvents(stateManager) {
   });
 }
 
-function openDayAvailabilityEditor(stateManager, date) {
+export function openDayAvailabilityEditor(stateManager, date, targetMemberId = null) {
   const state = stateManager.state;
-  const currentMember = state.members.find(m => m.id === state.currentMemberId) || state.members[0];
+  const currentMember = targetMemberId
+    ? state.members.find(m => m.id === targetMemberId)
+    : (state.members.find(m => m.id === state.currentMemberId) || state.members[0]);
+
   const existing = state.availability.find(a => a.member_id === currentMember.id && a.date === date) || {
     state: 'unset',
     start_time: '09:30',
@@ -212,7 +264,7 @@ function openDayAvailabilityEditor(stateManager, date) {
   const radioOptions = [
     { value: 'full', label: '○ 終日' },
     { value: 'range', label: '○ 時間を指定' },
-    { value: 'unavailable', label: '○ 出勤できない' },
+    { value: 'unavailable', label: '○ 出勤できない (×)' },
     { value: 'unset', label: '○ 未定' }
   ];
 
@@ -225,10 +277,13 @@ function openDayAvailabilityEditor(stateManager, date) {
 
   const isTimeRequired = existing.state === 'range' || existing.state === 'until' || existing.state === 'from';
 
+  const isProxy = targetMemberId && targetMemberId !== state.currentMemberId;
+
   const contentHTML = `
     <form id="day-avail-form" class="form-group" style="gap:var(--space-3);">
       <div style="font-size:1.1rem; font-weight:800; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
-        ${parseInt(m, 10)}月${parseInt(d, 10)}日（${dayOfWeek}）
+        ${currentMember.name} 様: ${parseInt(m, 10)}月${parseInt(d, 10)}日（${dayOfWeek}）
+        ${isProxy ? `<span style="font-size:0.75rem; color:var(--color-warning); font-weight:700; margin-left:8px;">[代理入力モード]</span>` : ''}
       </div>
 
       <div style="font-size:0.75rem; font-weight:800; color:var(--color-text-secondary); margin-top:4px;">勤務できる時間</div>

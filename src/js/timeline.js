@@ -1,10 +1,14 @@
-// Manager Workspace - Month View & Day Timeline Modes with Direct Manipulation
+// Manager Workspace - Redesigned Month Calendar & Day Timeline Modes
 import { getDaysInMonth, formatDateKey, getJapaneseDayOfWeek, parseTimeMinutes } from './dates.js';
 import { createBottomSheet, closeBottomSheet, showToast } from './ui.js';
 import { openShiftCreationModal, runAutoScheduler } from './scheduler.js';
 import { renderLaborCostPanel } from './costs.js';
 import { exportSchedulePNG } from './export.js';
-import { calculateDayShortages, calculateManagerSummary, formatCurrency, renderMiniShortageBar, generateUUID } from './utils.js';
+import { calculateDayShortages, calculateManagerSummary, formatCurrency, generateUUID } from './utils.js';
+import { renderSubmissionStatusPanel, openMonthlyRequestManagerModal } from './request.js';
+import { openSpecificDateOverrideModal } from './settings.js';
+import { openDayAvailabilityEditor } from './availability.js';
+import { getIconSVG } from './icons.js';
 
 let selectedShiftId = null;
 
@@ -17,7 +21,6 @@ function minutesToTimeString(mins) {
 export function renderManagerWorkspaceView(state) {
   const isMonthView = state.managerViewMode === 'month';
   const summary = calculateManagerSummary(state);
-  const [yearStr, monthStr] = state.currentMonthKey.split('-');
 
   return `
     <div style="display:flex; flex-direction:column; gap:var(--space-4);">
@@ -26,11 +29,15 @@ export function renderManagerWorkspaceView(state) {
         <div class="header-strip-meta">
           <div class="header-strip-item">
             <span class="header-strip-label">対象月</span>
-            <span class="header-strip-value">${yearStr}年${parseInt(monthStr, 10)}月</span>
+            <select id="workspace-month-picker" class="header-month-select">
+              <option value="2026-10" ${state.currentMonthKey === '2026-10' ? 'selected' : ''}>2026年10月</option>
+              <option value="2026-11" ${state.currentMonthKey === '2026-11' ? 'selected' : ''}>2026年11月</option>
+              <option value="2026-12" ${state.currentMonthKey === '2026-12' ? 'selected' : ''}>2026年12月</option>
+            </select>
           </div>
           <div class="header-strip-divider"></div>
           <div class="header-strip-item">
-            <span class="header-strip-label">提出</span>
+            <span class="header-strip-label">提出状況</span>
             <span class="header-strip-value">${summary.submittedStaffCount} / ${summary.totalStaffCount}名</span>
           </div>
           <div class="header-strip-divider"></div>
@@ -42,7 +49,7 @@ export function renderManagerWorkspaceView(state) {
           </div>
           <div class="header-strip-divider"></div>
           <div class="header-strip-item">
-            <span class="header-strip-label">勤務</span>
+            <span class="header-strip-label">総勤務</span>
             <span class="header-strip-value">${summary.totalScheduledHours.toFixed(1)}h</span>
           </div>
           <div class="header-strip-divider"></div>
@@ -53,6 +60,10 @@ export function renderManagerWorkspaceView(state) {
         </div>
 
         <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2);">
+          <button id="manage-monthly-request-btn" class="btn btn-secondary btn-sm">
+            ${getIconSVG('calendar', { size: 14 })} 募集設定
+          </button>
+
           <div class="segmented-control">
             <button id="mgr-mode-month-btn" class="segmented-btn ${isMonthView ? 'active' : ''}">月間</button>
             <button id="mgr-mode-timeline-btn" class="segmented-btn ${!isMonthView ? 'active' : ''}">1日</button>
@@ -68,13 +79,16 @@ export function renderManagerWorkspaceView(state) {
       <!-- Main Workspace Working Surface -->
       ${isMonthView ? renderManagerMonthView(state) : renderManagerDayTimelineView(state)}
 
+      <!-- Manager Continuous Submission Monitoring Panel -->
+      ${renderSubmissionStatusPanel(state)}
+
       <!-- Staff Labor Status View -->
       ${renderLaborCostPanel(state)}
     </div>
   `;
 }
 
-// Manager Month View Component
+// Redesigned Manager Month View Component
 function renderManagerMonthView(state) {
   const [yearStr, monthStr] = state.currentMonthKey.split('-');
   const year = parseInt(yearStr, 10);
@@ -84,31 +98,60 @@ function renderManagerMonthView(state) {
   let monthGridHTML = '';
   let mobileDateListHTML = '';
 
+  const activeStaffMembers = (state.members || []).filter(m => m.role === 'staff' && m.status === 'active');
+
+  // Insert empty offset cells so Day 1 aligns with its correct day-of-week column
+  const firstDayOfWeekIndex = new Date(year, monthIndex, 1).getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  for (let offset = 0; offset < firstDayOfWeekIndex; offset++) {
+    monthGridHTML += `<div class="calendar-cell calendar-cell-empty" style="background:#fafafa; cursor:default;"></div>`;
+  }
+
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);
     const isWeekend = dayOfWeek === '土' || dayOfWeek === '日';
 
-    const dayAssignments = state.assignments.filter(a => a.date === dateKey);
     const isSelected = state.selectedDate === dateKey;
     const dayShortage = calculateDayShortages(dateKey, state);
 
-    // Shortage timeline mini bar
-    const shortageBarHTML = dayShortage.hasShortage
-      ? renderMiniShortageBar(dayShortage.shortageItems)
-      : '';
+    // Staff availability list for this day with 3–4px staff-color vertical marker and subtle tint
+    const dayAvails = (state.availability || []).filter(a => a.date === dateKey);
 
-    // Shortage slot strips inside cell
-    const shortageSlotsHTML = dayShortage.hasShortage ? `
-      <div class="cell-shortage-box">
-        ${dayShortage.shortageItems.map(item => `
-          <div class="shortage-slot-strip">
-            <span>不足 ${item.timeStart}–${item.timeEnd}</span>
-            <span>-${item.deficit}名</span>
-          </div>
-        `).join('')}
+    const staffAvailRows = activeStaffMembers.map(m => {
+      const av = dayAvails.find(a => a.member_id === m.id);
+      if (!av || !av.state || av.state === 'unset') return null;
+
+      let timeLabel = '未定';
+      if (av.state === 'full') timeLabel = '終日';
+      else if (av.state === 'range') timeLabel = `${av.start_time || '09:30'}–${av.end_time || '18:30'}`;
+      else if (av.state === 'from') timeLabel = `${av.start_time || '12:00'}〜`;
+      else if (av.state === 'until') timeLabel = `〜${av.start_time || '18:00'}`;
+      else if (av.state === 'unavailable') timeLabel = '×';
+
+      return { member: m, timeLabel };
+    }).filter(Boolean);
+
+    const visibleStaff = staffAvailRows.slice(0, 3);
+    const hiddenCount = Math.max(0, staffAvailRows.length - 3);
+
+    const visibleStaffHTML = visibleStaff.map(s => `
+      <div class="staff-avail-row" style="border-left-color:${s.member.color}; background:${s.member.color}12;">
+        <span class="staff-avail-name">${s.member.name.split(' ')[0]}</span>
+        <span class="staff-avail-time">${s.timeLabel}</span>
       </div>
-    ` : '';
+    `).join('');
+
+    // Single simplified shortage summary line per date in Month View (e.g. "不足 11:00–20:00")
+    let consolidatedShortageHTML = '';
+    if (dayShortage.hasShortage) {
+      const prefix = dayShortage.isProvisional ? '現時点の不足' : '不足';
+      consolidatedShortageHTML = `
+        <div class="consolidated-shortage-box">
+          <div class="shortage-header-title">${prefix} ${dayShortage.monthShortageRange}</div>
+          ${dayShortage.unenteredCount > 0 ? `<div class="shortage-unentered-text">未入力 ${dayShortage.unenteredCount}人</div>` : ''}
+        </div>
+      `;
+    }
 
     // Desktop/iPad Calendar Cell
     monthGridHTML += `
@@ -117,47 +160,48 @@ function renderManagerMonthView(state) {
           <span class="calendar-cell-num ${isWeekend ? 'weekend' : ''}">
             ${day}<small class="calendar-cell-dayofweek">(${dayOfWeek})</small>
           </span>
-          <span style="font-size:0.65rem; font-weight:700; color:${dayAssignments.length > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'};">
-            配置 ${dayAssignments.length}名
+          <span style="font-size:0.675rem; font-weight:700; color:var(--color-text-muted);">
+            入力 ${dayShortage.enteredCount} / ${dayShortage.totalExpectedCount}
           </span>
         </div>
 
-        ${shortageBarHTML}
-        ${shortageSlotsHTML}
+        <div style="display:flex; flex-direction:column; gap:3px; margin-top:6px;">
+          ${visibleStaffHTML}
+          ${hiddenCount > 0 ? `<div style="font-size:0.65rem; font-weight:700; color:var(--color-text-muted); text-align:right;">+${hiddenCount}人</div>` : ''}
+        </div>
 
-        <div style="display:flex; flex-direction:column; gap:2px; margin-top:auto;">
-          ${dayAssignments.slice(0, 2).map(a => {
-            const member = state.members.find(m => m.id === a.member_id);
-            return `
-              <div style="display:flex; align-items:center; gap:4px; font-size:0.625rem; font-weight:600; background:var(--color-surface-subtle); padding:1px 3px; border-radius:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                <span class="timeline-staff-dot" style="background:${member ? member.color : '#000'};"></span>
-                <span>${member ? member.name.split(' ')[0] : 'スタッフ'}</span>
-                <span style="color:var(--color-text-muted); font-weight:500;">${a.start_time.split(':')[0]}-${a.end_time.split(':')[0]}</span>
-              </div>
-            `;
-          }).join('')}
-          ${dayAssignments.length > 2 ? `<div style="font-size:0.6rem; font-weight:600; color:var(--color-text-muted);">+他${dayAssignments.length - 2}名</div>` : ''}
+        ${consolidatedShortageHTML}
+
+        <div style="margin-top:auto; display:flex; justify-content:flex-end; padding-top:4px;">
+          <button class="btn btn-secondary btn-sm date-override-btn" data-date="${dateKey}" style="font-size:0.625rem; padding:0 4px; border:none; color:var(--color-text-muted);">
+            この日の人員設定
+          </button>
         </div>
       </div>
     `;
 
     // Mobile (iPhone) Operational Date List Item
     mobileDateListHTML += `
-      <div class="settings-row ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}" style="cursor:pointer; padding:10px 12px;">
-        <div style="display:flex; flex-direction:column; gap:2px;">
-          <div style="display:flex; align-items:center; gap:var(--space-2);">
-            <strong style="font-size:0.875rem;">${year}年${monthIndex + 1}月${day}日（${dayOfWeek}）</strong>
-            <span style="font-size:0.75rem; color:var(--color-text-muted);">配置 ${dayAssignments.length}名</span>
+      <div class="settings-row ${dayShortage.hasShortage ? 'has-shortage' : ''}" data-mgr-date="${dateKey}" style="cursor:pointer; padding:12px 14px;">
+        <div style="display:flex; flex-direction:column; gap:6px; flex:1;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong style="font-size:0.9rem;">${year}年${monthIndex + 1}月${day}日（${dayOfWeek}）</strong>
+            <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-muted);">入力 ${dayShortage.enteredCount} / ${dayShortage.totalExpectedCount}人</span>
           </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:4px;">
+            ${visibleStaffHTML || `<span style="font-size:0.75rem; color:var(--color-text-muted);">入力なし</span>`}
+          </div>
+
           ${dayShortage.hasShortage ? `
-            <div style="font-size:0.725rem; font-weight:700; color:var(--color-danger);">
-              ${dayShortage.shortageItems.map(item => `${item.timeStart}–${item.timeEnd} ${item.deficit}名不足`).join(' / ')}
+            <div style="font-size:0.75rem; font-weight:800; color:var(--color-danger);">
+              ${dayShortage.isProvisional ? '【現時点の不足】 ' : '【不足】 '}${dayShortage.summaryText}
             </div>
           ` : `
-            <div style="font-size:0.725rem; font-weight:600; color:var(--color-success);">適正配置</div>
+            <div style="font-size:0.725rem; font-weight:700; color:var(--color-success);">適正配置</div>
           `}
         </div>
-        <span style="font-size:0.75rem; color:var(--color-text-muted);">＞</span>
+        <span style="font-size:0.8rem; color:var(--color-text-muted); margin-left:8px;">＞</span>
       </div>
     `;
   }
@@ -165,8 +209,8 @@ function renderManagerMonthView(state) {
   return `
     <div class="calendar-surface">
       <div class="calendar-surface-header">
-        <span style="font-weight:800; font-size:0.9rem;">${year}年${monthIndex + 1}月 月間シフト</span>
-        <span style="font-size:0.725rem; color:var(--color-text-muted);">日付を選ぶと1日タイムラインへ移動します</span>
+        <span style="font-weight:800; font-size:0.9rem;">${year}年${monthIndex + 1}月 月間希望・人員不足状況</span>
+        <span style="font-size:0.725rem; color:var(--color-text-muted);">日付選択で1日タイムラインを表示します</span>
       </div>
 
       <div class="calendar-grid-table">
@@ -196,7 +240,6 @@ function renderManagerDayTimelineView(state) {
 
   const dayShortage = calculateDayShortages(selectedDate, state);
 
-  // Hour column headers (09, 10, ... 21)
   const hourCols = [];
   for (let m = storeOpenMinutes; m <= storeCloseMinutes; m += 60) {
     hourCols.push(Math.floor(m / 60));
@@ -204,18 +247,19 @@ function renderManagerDayTimelineView(state) {
 
   const hourHeadersHTML = hourCols.map(h => `<div class="timeline-hour-head">${h}:00</div>`).join('');
 
-  // Coverage Strip calculations (required vs assigned for each hour interval)
   const coverageCellsHTML = hourCols.map(h => {
     const slotStartM = h * 60;
     const slotEndM = slotStartM + 60;
 
-    const matchingRule = (state.staffingRules || []).find(r => {
-      const rStart = parseTimeMinutes(r.time_start);
-      const rEnd = parseTimeMinutes(r.time_end);
-      return slotStartM >= rStart && slotStartM < rEnd;
-    }) || { required_count: 2 };
-
-    const reqCount = matchingRule.required_count;
+    let reqCount = 2;
+    if (dayShortage.shortageItems && dayShortage.shortageItems.length > 0) {
+      const match = dayShortage.shortageItems.find(item => {
+        const sM = parseTimeMinutes(item.timeStart);
+        const eM = parseTimeMinutes(item.timeEnd);
+        return slotStartM >= sM && slotStartM < eM;
+      });
+      if (match) reqCount = match.required;
+    }
 
     const asgsOnDate = state.assignments.filter(a => a.date === selectedDate);
     let assignedCount = 0;
@@ -235,7 +279,6 @@ function renderManagerDayTimelineView(state) {
     `;
   }).join('');
 
-  // Staff Timeline Rows
   const staffRowsHTML = state.members.map(member => {
     const avail = state.availability.find(a => a.member_id === member.id && a.date === selectedDate);
     const asgs = state.assignments.filter(a => a.member_id === member.id && a.date === selectedDate);
@@ -246,7 +289,6 @@ function renderManagerDayTimelineView(state) {
       totalMonthlyHours += Math.max(0, dur);
     });
 
-    // Translucent availability layer
     let availBlockHTML = '';
     if (avail && avail.state !== 'unavailable' && avail.state !== 'unset') {
       let startM = storeOpenMinutes;
@@ -267,7 +309,6 @@ function renderManagerDayTimelineView(state) {
       `;
     }
 
-    // Solid assignment shift blocks
     const shiftBlocksHTML = asgs.map(asg => {
       const startM = parseTimeMinutes(asg.start_time);
       const endM = parseTimeMinutes(asg.end_time);
@@ -310,51 +351,6 @@ function renderManagerDayTimelineView(state) {
     `;
   }).join('');
 
-  // Selected shift inspector HTML
-  let inspectorHTML = '';
-  if (selectedShiftId) {
-    const asg = state.assignments.find(a => a.id === selectedShiftId);
-    if (asg) {
-      const member = state.members.find(m => m.id === asg.member_id);
-      const avail = state.availability.find(a => a.member_id === asg.member_id && a.date === asg.date);
-      let availDesc = '未定';
-      if (avail) {
-        if (avail.state === 'full') availDesc = '終日';
-        else if (avail.state === 'range') availDesc = `時間指定 (${avail.start_time || ''}–${avail.end_time || ''})`;
-        else if (avail.state === 'unavailable') availDesc = '出勤不可';
-      }
-
-      let totalM = 0;
-      state.assignments.filter(a => a.member_id === asg.member_id).forEach(a => {
-        totalM += (parseTimeMinutes(a.end_time) - parseTimeMinutes(a.start_time) - (a.break_minutes || 0)) / 60;
-      });
-
-      inspectorHTML = `
-        <div class="context-inspector">
-          <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); padding-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="timeline-staff-dot" style="background:${member ? member.color : '#000'};"></span>
-              <strong style="font-size:0.875rem;">${member ? member.name : 'スタッフ'}</strong>
-              <span style="font-size:0.75rem; color:var(--color-text-muted);">${asg.date}</span>
-            </div>
-            <button id="close-inspector-btn" class="btn btn-secondary btn-sm">✕</button>
-          </div>
-
-          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2); font-size:0.8rem;">
-            <div>勤務: <strong>${asg.start_time} → ${asg.end_time}</strong> (休憩 ${asg.break_minutes || 0}分)</div>
-            <div>希望: <strong>${availDesc}</strong></div>
-            <div>月間: <strong>${totalM.toFixed(1)} / ${(member && member.max_monthly_hours) ? member.max_monthly_hours : 100}h</strong></div>
-
-            <div style="display:flex; gap:var(--space-2);">
-              <button id="edit-inspector-shift-btn" class="btn btn-secondary btn-sm">編集</button>
-              <button id="delete-inspector-shift-btn" class="btn btn-secondary btn-sm" style="color:var(--color-danger); border-color:var(--color-danger-border);">削除</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-  }
-
   const [yStr, mStr, dStr] = selectedDate.split('-');
   const selectedDateFormatted = `${parseInt(mStr, 10)}月${parseInt(dStr, 10)}日のシフト`;
 
@@ -363,15 +359,17 @@ function renderManagerDayTimelineView(state) {
       <div class="day-workspace-toolbar">
         <div>
           <span style="font-weight:800; font-size:0.9rem;">${selectedDateFormatted}</span>
-          <span style="font-size:0.725rem; color:var(--color-text-muted); margin-left:8px;">空いている時間をドラッグして追加</span>
+          <button id="direct-date-override-btn" class="btn btn-secondary btn-sm" style="margin-left:12px;">
+            ${getIconSVG('settings', { size: 12 })} この日の人員設定
+          </button>
         </div>
 
         ${dayShortage.hasShortage ? `
-          <div style="font-size:0.725rem; font-weight:700; color:var(--color-danger); background:var(--color-danger-bg); border:1px solid var(--color-danger-border); padding:2px 8px; border-radius:var(--radius-xs);">
-            人員不足: ${dayShortage.summaryText}
+          <div style="font-size:0.75rem; font-weight:800; color:var(--color-danger); background:var(--color-danger-bg); border:1px solid var(--color-danger-border); padding:2px 8px; border-radius:var(--radius-xs);">
+            ${dayShortage.isProvisional ? '【現時点】 ' : ''}人員不足: ${dayShortage.summaryText}
           </div>
         ` : `
-          <div style="font-size:0.725rem; font-weight:700; color:var(--color-success); background:var(--color-success-bg); border:1px solid var(--color-success-border); padding:2px 8px; border-radius:var(--radius-xs);">
+          <div style="font-size:0.75rem; font-weight:800; color:var(--color-success); background:var(--color-success-bg); border:1px solid var(--color-success-border); padding:2px 8px; border-radius:var(--radius-xs);">
             適正配置
           </div>
         `}
@@ -392,39 +390,76 @@ function renderManagerDayTimelineView(state) {
           ${staffRowsHTML}
         </div>
       </div>
-
-      ${inspectorHTML}
     </div>
   `;
 }
 
-// Event Listeners setup for Manager Workspace with Direct Manipulation
+// Event Listeners setup for Manager Workspace
 export function setupTimelineEvents(stateManager) {
   const monthBtn = document.getElementById('mgr-mode-month-btn');
   const timelineBtn = document.getElementById('mgr-mode-timeline-btn');
   const datePicker = document.getElementById('mgr-date-picker');
+  const monthPicker = document.getElementById('workspace-month-picker');
 
   if (monthBtn) monthBtn.addEventListener('click', () => stateManager.setManagerViewMode('month'));
   if (timelineBtn) timelineBtn.addEventListener('click', () => stateManager.setManagerViewMode('timeline'));
   if (datePicker) datePicker.addEventListener('change', (e) => stateManager.setSelectedDate(e.target.value));
+  if (monthPicker) monthPicker.addEventListener('change', (e) => stateManager.setCurrentMonthKey(e.target.value));
 
-  // Calendar cells in Month View
+  const manageReqBtn = document.getElementById('manage-monthly-request-btn');
+  if (manageReqBtn) {
+    manageReqBtn.addEventListener('click', () => {
+      openMonthlyRequestManagerModal(stateManager);
+    });
+  }
+
   const mgrMonthCells = document.querySelectorAll('[data-mgr-date]');
   mgrMonthCells.forEach(cell => {
-    cell.addEventListener('click', () => {
+    cell.addEventListener('click', (e) => {
+      if (e.target.closest('.date-override-btn')) return;
       const date = cell.getAttribute('data-mgr-date');
       stateManager.setSelectedDate(date);
       stateManager.setManagerViewMode('timeline');
     });
   });
 
-  // Time parameters
+  const dateOverrideBtns = document.querySelectorAll('.date-override-btn');
+  dateOverrideBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const date = btn.getAttribute('data-date');
+      openSpecificDateOverrideModal(stateManager, date);
+    });
+  });
+
+  const directDateOverrideBtn = document.getElementById('direct-date-override-btn');
+  if (directDateOverrideBtn) {
+    directDateOverrideBtn.addEventListener('click', () => {
+      openSpecificDateOverrideModal(stateManager, stateManager.state.selectedDate);
+    });
+  }
+
+  const inspectBtns = document.querySelectorAll('.inspect-partial-btn');
+  inspectBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const memberId = btn.getAttribute('data-member-id');
+      openDayAvailabilityEditor(stateManager, stateManager.state.selectedDate, memberId);
+    });
+  });
+
+  const subFilterBtns = document.querySelectorAll('#submission-filter-control .segmented-btn');
+  subFilterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.getAttribute('data-filter');
+      stateManager.setSubmissionFilter(f);
+    });
+  });
+
   const state = stateManager.state;
   const storeOpenMinutes = parseTimeMinutes(state.store ? state.store.default_open_time : '09:00');
   const storeCloseMinutes = parseTimeMinutes(state.store ? state.store.default_close_time : '21:30');
   const totalTimelineMinutes = storeCloseMinutes - storeOpenMinutes;
 
-  // Track click and drag manipulation
   const tracks = document.querySelectorAll('.timeline-track-cell');
   tracks.forEach(track => {
     let isDraggingTrack = false;
@@ -479,7 +514,6 @@ export function setupTimelineEvents(stateManager) {
     });
   });
 
-  // Shift block direct drag move / resize handle manipulation
   const shiftBlocks = document.querySelectorAll('.shift-block-layer');
   shiftBlocks.forEach(block => {
     const asgId = block.getAttribute('data-asg-id');
@@ -487,7 +521,7 @@ export function setupTimelineEvents(stateManager) {
     if (!asg) return;
 
     let isInteracting = false;
-    let mode = 'move'; // 'move', 'resize-left', 'resize-right'
+    let mode = 'move';
     let startX = 0;
     let origStartM = parseTimeMinutes(asg.start_time);
     let origEndM = parseTimeMinutes(asg.end_time);
@@ -578,32 +612,6 @@ export function setupTimelineEvents(stateManager) {
     });
   });
 
-  const closeInspectorBtn = document.getElementById('close-inspector-btn');
-  if (closeInspectorBtn) {
-    closeInspectorBtn.addEventListener('click', () => {
-      selectedShiftId = null;
-      stateManager.notify();
-    });
-  }
-
-  const editInspectorBtn = document.getElementById('edit-inspector-shift-btn');
-  if (editInspectorBtn && selectedShiftId) {
-    editInspectorBtn.addEventListener('click', () => {
-      openShiftEditModal(stateManager, selectedShiftId);
-    });
-  }
-
-  const deleteInspectorBtn = document.getElementById('delete-inspector-shift-btn');
-  if (deleteInspectorBtn && selectedShiftId) {
-    deleteInspectorBtn.addEventListener('click', async () => {
-      const asgIdToDelete = selectedShiftId;
-      selectedShiftId = null;
-      await stateManager.deleteAssignment(asgIdToDelete);
-      showToast('シフトを削除しました');
-    });
-  }
-
-  // AI Shift Generator button
   const aiBtn = document.getElementById('ai-generate-btn');
   if (aiBtn) {
     aiBtn.addEventListener('click', () => {
@@ -611,93 +619,10 @@ export function setupTimelineEvents(stateManager) {
     });
   }
 
-  // PNG Export button
   const exportBtn = document.getElementById('export-png-btn');
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
       exportSchedulePNG(stateManager.state);
     });
   }
-}
-
-function openShiftEditModal(stateManager, asgId) {
-  const asg = stateManager.state.assignments.find(a => a.id === asgId);
-  if (!asg) return;
-
-  const member = stateManager.state.members.find(m => m.id === asg.member_id);
-  const avail = stateManager.state.availability.find(a => a.member_id === asg.member_id && a.date === asg.date);
-
-  let availDesc = '未定';
-  if (avail) {
-    if (avail.state === 'full') availDesc = '終日';
-    else if (avail.state === 'range') availDesc = `時間指定 (${avail.start_time || ''}–${avail.end_time || ''})`;
-    else if (avail.state === 'unavailable') availDesc = '出勤不可';
-  }
-
-  const contentHTML = `
-    <div class="form-group" style="gap:var(--space-3);">
-      <div style="font-size:0.95rem; font-weight:800; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--color-border); padding-bottom:var(--space-2);">
-        <span class="timeline-staff-dot" style="background:${member ? member.color : '#000'};"></span>
-        ${member ? member.name : 'スタッフ'} のシフト調整 (${asg.date})
-      </div>
-
-      <div style="font-size:0.75rem; color:var(--color-text-secondary); background:var(--color-surface-subtle); padding:6px 10px; border-radius:var(--radius-xs);">
-        本人希望: <strong>${availDesc}</strong>
-      </div>
-
-      <div style="display:flex; gap:var(--space-2);">
-        <div class="form-group" style="flex:1;">
-          <label class="form-label">開始時間</label>
-          <input type="time" id="edit-start-time" class="form-input" value="${asg.start_time}" step="900" />
-        </div>
-        <div class="form-group" style="flex:1;">
-          <label class="form-label">終了時間</label>
-          <input type="time" id="edit-end-time" class="form-input" value="${asg.end_time}" step="900" />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">休憩時間（分）</label>
-        <input type="number" id="edit-break-min" class="form-input" value="${asg.break_minutes || 60}" step="15" min="0" />
-      </div>
-
-      <div style="display:flex; justify-content:space-between; margin-top:var(--space-2);">
-        <button type="button" id="delete-shift-btn" class="btn btn-secondary" style="color:var(--color-danger); border-color:var(--color-danger-border);">削除</button>
-        <div style="display:flex; gap:var(--space-2);">
-          <button type="button" class="btn btn-secondary close-sheet-btn">キャンセル</button>
-          <button type="button" id="save-shift-btn" class="btn btn-primary">更新保存</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  createBottomSheet({
-    title: '',
-    contentHTML,
-    onOpen: (body) => {
-      body.querySelector('#save-shift-btn').addEventListener('click', async () => {
-        const startTime = body.querySelector('#edit-start-time').value;
-        const endTime = body.querySelector('#edit-end-time').value;
-        const breakMin = parseInt(body.querySelector('#edit-break-min').value, 10) || 0;
-
-        await stateManager.saveAssignment({
-          ...asg,
-          start_time: startTime,
-          end_time: endTime,
-          break_minutes: breakMin
-        });
-
-        closeBottomSheet();
-        selectedShiftId = null;
-        showToast('シフトを更新しました');
-      });
-
-      body.querySelector('#delete-shift-btn').addEventListener('click', async () => {
-        await stateManager.deleteAssignment(asgId);
-        closeBottomSheet();
-        selectedShiftId = null;
-        showToast('シフトを削除しました');
-      });
-    }
-  });
 }
