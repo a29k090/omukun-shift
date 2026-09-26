@@ -59,11 +59,8 @@ export function renderManagerWorkspaceView(state) {
           </div>
         </div>
 
-        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2);">
-          <button id="manage-monthly-request-btn" class="btn btn-secondary btn-sm">
-            ${getIconSVG('calendar', { size: 14 })} 募集設定
-          </button>
-
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3);">
+          <!-- Center: Mode Selector & Staff Filter -->
           <div class="segmented-control">
             <button id="mgr-mode-month-btn" class="segmented-btn ${isMonthView ? 'active' : ''}">月間</button>
             <button id="mgr-mode-timeline-btn" class="segmented-btn ${!isMonthView ? 'active' : ''}">1日</button>
@@ -71,6 +68,17 @@ export function renderManagerWorkspaceView(state) {
 
           <input type="date" id="mgr-date-picker" class="form-input" value="${state.selectedDate}" style="padding:2px 6px; font-weight:700; font-size:0.75rem;" />
 
+          <select id="staff-filter-select" class="form-select" style="padding:2px 6px; font-weight:700; font-size:0.75rem; min-height:32px;">
+            <option value="all" ${state.selectedStaffFilter === 'all' ? 'selected' : ''}>全員</option>
+            ${(state.members || []).filter(m => m.role === 'staff').map(m => `
+              <option value="${m.id}" ${state.selectedStaffFilter === m.id ? 'selected' : ''}>● ${m.name}</option>
+            `).join('')}
+          </select>
+
+          <!-- Right: Action Buttons with Clear Priority -->
+          <button id="manage-monthly-request-btn" class="btn btn-secondary btn-sm">
+            ${getIconSVG('calendar', { size: 14 })} 募集設定
+          </button>
           <button id="ai-generate-btn" class="btn btn-primary btn-sm">仮シフトを作成</button>
           <button id="export-png-btn" class="btn btn-secondary btn-sm">画像を書き出す</button>
         </div>
@@ -99,6 +107,12 @@ function renderManagerMonthView(state) {
   let mobileDateListHTML = '';
 
   const activeStaffMembers = (state.members || []).filter(m => m.role === 'staff' && m.status === 'active');
+  const selectedFilterId = state.selectedStaffFilter || 'all';
+
+  // Filter staff members if specific staff filter selected
+  const targetStaffMembers = selectedFilterId === 'all'
+    ? activeStaffMembers
+    : activeStaffMembers.filter(m => m.id === selectedFilterId);
 
   // Insert empty offset cells so Day 1 aligns with its correct day-of-week column
   const firstDayOfWeekIndex = new Date(year, monthIndex, 1).getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
@@ -117,16 +131,20 @@ function renderManagerMonthView(state) {
     // Staff availability list for this day with 3–4px staff-color vertical marker and subtle tint
     const dayAvails = (state.availability || []).filter(a => a.date === dateKey);
 
-    const staffAvailRows = activeStaffMembers.map(m => {
+    const staffAvailRows = targetStaffMembers.map(m => {
       const av = dayAvails.find(a => a.member_id === m.id);
-      if (!av || !av.state || av.state === 'unset') return null;
 
-      let timeLabel = '未定';
-      if (av.state === 'full') timeLabel = '終日';
-      else if (av.state === 'range') timeLabel = `${av.start_time || '09:30'}–${av.end_time || '18:30'}`;
-      else if (av.state === 'from') timeLabel = `${av.start_time || '12:00'}〜`;
-      else if (av.state === 'until') timeLabel = `〜${av.start_time || '18:00'}`;
-      else if (av.state === 'unavailable') timeLabel = '×';
+      let timeLabel = '未入力';
+      if (av && av.state) {
+        if (av.state === 'full') timeLabel = '終日';
+        else if (av.state === 'range') timeLabel = `${av.start_time || '09:30'}–${av.end_time || '18:30'}`;
+        else if (av.state === 'from') timeLabel = `${av.start_time || '12:00'}〜`;
+        else if (av.state === 'until') timeLabel = `〜${av.start_time || '18:00'}`;
+        else if (av.state === 'unavailable') timeLabel = '×';
+        else if (av.state === 'unset') timeLabel = '未定';
+      } else if (selectedFilterId === 'all') {
+        return null;
+      }
 
       return { member: m, timeLabel };
     }).filter(Boolean);
@@ -159,6 +177,7 @@ function renderManagerMonthView(state) {
         <div class="calendar-cell-top">
           <span class="calendar-cell-num ${isWeekend ? 'weekend' : ''}">
             ${day}<small class="calendar-cell-dayofweek">(${dayOfWeek})</small>
+            ${state.confirmedDays && state.confirmedDays[dateKey] ? `<span style="font-size:0.625rem; font-weight:800; color:var(--color-success); margin-left:4px;">✓ 確定</span>` : ''}
           </span>
           <span style="font-size:0.675rem; font-weight:700; color:var(--color-text-muted);">
             入力 ${dayShortage.enteredCount} / ${dayShortage.totalExpectedCount}
@@ -171,12 +190,6 @@ function renderManagerMonthView(state) {
         </div>
 
         ${consolidatedShortageHTML}
-
-        <div style="margin-top:auto; display:flex; justify-content:flex-end; padding-top:4px;">
-          <button class="btn btn-secondary btn-sm date-override-btn" data-date="${dateKey}" style="font-size:0.625rem; padding:0 4px; border:none; color:var(--color-text-muted);">
-            この日の人員設定
-          </button>
-        </div>
       </div>
     `;
 
@@ -357,10 +370,13 @@ function renderManagerDayTimelineView(state) {
   return `
     <div class="day-workspace">
       <div class="day-workspace-toolbar">
-        <div>
+        <div style="display:flex; align-items:center; gap:var(--space-3);">
           <span style="font-weight:800; font-size:0.9rem;">${selectedDateFormatted}</span>
-          <button id="direct-date-override-btn" class="btn btn-secondary btn-sm" style="margin-left:12px;">
+          <button id="direct-date-override-btn" class="btn btn-secondary btn-sm">
             ${getIconSVG('settings', { size: 12 })} この日の人員設定
+          </button>
+          <button id="toggle-confirm-day-btn" class="btn ${state.confirmedDays && state.confirmedDays[selectedDate] ? 'btn-secondary' : 'btn-primary'} btn-sm">
+            ${state.confirmedDays && state.confirmedDays[selectedDate] ? '✓ 確定済み (編集を再開)' : 'この日のシフトを確定'}
           </button>
         </div>
 
@@ -406,6 +422,13 @@ export function setupTimelineEvents(stateManager) {
   if (datePicker) datePicker.addEventListener('change', (e) => stateManager.setSelectedDate(e.target.value));
   if (monthPicker) monthPicker.addEventListener('change', (e) => stateManager.setCurrentMonthKey(e.target.value));
 
+  const staffFilterSelect = document.getElementById('staff-filter-select');
+  if (staffFilterSelect) {
+    staffFilterSelect.addEventListener('change', (e) => {
+      stateManager.setState({ selectedStaffFilter: e.target.value });
+    });
+  }
+
   const manageReqBtn = document.getElementById('manage-monthly-request-btn');
   if (manageReqBtn) {
     manageReqBtn.addEventListener('click', () => {
@@ -439,10 +462,32 @@ export function setupTimelineEvents(stateManager) {
     });
   }
 
-  const inspectBtns = document.querySelectorAll('.inspect-partial-btn');
-  inspectBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const memberId = btn.getAttribute('data-member-id');
+  const toggleConfirmDayBtn = document.getElementById('toggle-confirm-day-btn');
+  if (toggleConfirmDayBtn) {
+    toggleConfirmDayBtn.addEventListener('click', () => {
+      const state = stateManager.state;
+      const date = state.selectedDate;
+      const isCurrentlyConfirmed = state.confirmedDays && state.confirmedDays[date];
+
+      if (isCurrentlyConfirmed) {
+        if (confirm(`${date} の確定解除を行いますか？`)) {
+          const nextConfirmed = { ...state.confirmedDays };
+          delete nextConfirmed[date];
+          stateManager.setState({ confirmedDays: nextConfirmed });
+          showToast(`${date} の確定を解除しました`);
+        }
+      } else {
+        const nextConfirmed = { ...state.confirmedDays, [date]: true };
+        stateManager.setState({ confirmedDays: nextConfirmed });
+        showToast(`${date} のシフトを確定しました`);
+      }
+    });
+  }
+
+  const submissionRows = document.querySelectorAll('.view-submission-detail-row');
+  submissionRows.forEach(row => {
+    row.addEventListener('click', () => {
+      const memberId = row.getAttribute('data-member-id');
       openDayAvailabilityEditor(stateManager, stateManager.state.selectedDate, memberId);
     });
   });

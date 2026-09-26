@@ -212,6 +212,9 @@ export function runAutoScheduler(stateManager) {
         const presets = state.presets.length > 0 ? state.presets : [{ id: 'preset-A', start_time: '09:30', end_time: '18:30', break_minutes: 60 }];
 
         for (const dateKey of datesInMonth) {
+          // Do NOT overwrite confirmed dates
+          if (state.confirmedDays && state.confirmedDays[dateKey]) continue;
+
           const existingOnDate = newAssignments.filter(a => a.date === dateKey);
           if (existingOnDate.length >= 2) continue;
 

@@ -59,8 +59,13 @@ export function renderStaffAvailabilityView(state) {
     }
   }
 
-  // Generate calendar cells
+  // Generate calendar cells with leading offset empty cells for day-1 alignment
   let calendarDaysHTML = '';
+  const firstDayOfWeekIndex = new Date(year, monthIndex, 1).getDay();
+  for (let offset = 0; offset < firstDayOfWeekIndex; offset++) {
+    calendarDaysHTML += `<div class="calendar-cell calendar-cell-empty" style="background:#fafafa; cursor:default;"></div>`;
+  }
+
   for (let day = 1; day <= daysInMonth; day++) {
     const dateKey = formatDateKey(year, monthIndex, day);
     const dayOfWeek = getJapaneseDayOfWeek(year, monthIndex, day);

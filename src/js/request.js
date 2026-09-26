@@ -54,7 +54,7 @@ export function renderSubmissionStatusPanel(state) {
   });
 
   const rowsHTML = filteredList.map(item => `
-    <div class="settings-row" data-member-id="${item.member.id}">
+    <div class="settings-row view-submission-detail-row" data-member-id="${item.member.id}" style="cursor:pointer;">
       <div style="display:flex; align-items:center; gap:var(--space-3);">
         <span class="timeline-staff-dot" style="background:${item.member.color};"></span>
         <strong style="font-size:0.875rem;">${item.member.name}</strong>
@@ -64,9 +64,7 @@ export function renderSubmissionStatusPanel(state) {
       <div style="display:flex; align-items:center; gap:var(--space-3);">
         <span style="font-size:0.75rem; font-weight:700; color:var(--color-text-secondary);">${item.enteredDays}日 入力済み</span>
         <span style="font-size:0.725rem; color:var(--color-text-muted);">最終更新: ${item.lastUpdated}</span>
-        <button class="btn btn-secondary btn-sm inspect-partial-btn" data-member-id="${item.member.id}">
-          ${getIconSVG('eye', { size: 12 })} 閲覧・代理入力
-        </button>
+        <span style="font-size:0.75rem; color:var(--color-text-muted);">＞</span>
       </div>
     </div>
   `).join('');

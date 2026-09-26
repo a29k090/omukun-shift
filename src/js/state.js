@@ -16,6 +16,8 @@ class StateManager {
       currentView: 'workspace', // 'workspace', 'settings', 'auth'
       settingsCategory: 'store', // 'store', 'staffing', 'presets', 'staff', 'rules', 'pay', 'invites', 'account'
       submissionFilter: 'all', // 'all', 'not_started', 'in_progress', 'submitted'
+      selectedStaffFilter: 'all', // 'all' or specific staff member id
+      confirmedDays: {}, // map of dateKey -> boolean or object
       saveStatus: 'saved',
       store: null,
       members: [],
